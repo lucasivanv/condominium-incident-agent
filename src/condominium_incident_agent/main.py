@@ -7,8 +7,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from incident_classification_agent.graph import build_graph
-from incident_classification_agent.schemas import IncidentInput
+from condominium_incident_agent.graph import build_graph
+from condominium_incident_agent.schemas import IncidentInput
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,14 +59,14 @@ def main() -> None:
     de estado do checkpointer seja isolado por quem reporta os incidentes.
 
     Uso:
-        python -m incident_classification_agent.main <caminho/para/input.json>
+        python -m condominium_incident_agent.main <caminho/para/input.json>
 
     Exemplo:
-        python -m incident_classification_agent.main examples/input.json
+        python -m condominium_incident_agent.main examples/input.json
     """
     if len(sys.argv) != 2:
-        print("Uso: python -m incident_classification_agent.main <caminho/para/input.json>")
-        print("Exemplo: python -m incident_classification_agent.main examples/input.json")
+        print("Uso: python -m condominium_incident_agent.main <caminho/para/input.json>")
+        print("Exemplo: python -m condominium_incident_agent.main examples/input.json")
         sys.exit(1)
 
     try:
@@ -88,7 +88,7 @@ def main() -> None:
     config = {"configurable": {"thread_id": thread_id}}
 
     print("\n⏳ Processando...\n")
-    logger.info("Starting incident classification agent — thread_id: %s", thread_id)
+    logger.info("Starting condominium incident agent — thread_id: %s", thread_id)
 
     final_state = graph.invoke(initial_state, config=config)
 

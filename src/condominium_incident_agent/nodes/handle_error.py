@@ -2,7 +2,7 @@
 
 import logging
 
-from incident_classification_agent.state import AgentState
+from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
 

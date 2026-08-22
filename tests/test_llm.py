@@ -1,4 +1,4 @@
-from incident_classification_agent.llm import get_llm
+from condominium_incident_agent.llm import get_llm
 
 
 def test_ollama_connection():

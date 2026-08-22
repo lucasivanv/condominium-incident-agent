@@ -6,8 +6,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from incident_classification_agent.session import append_to_session
-from incident_classification_agent.state import AgentState
+from condominium_incident_agent.session import append_to_session
+from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
 

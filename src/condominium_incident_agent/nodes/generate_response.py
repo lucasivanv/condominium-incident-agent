@@ -2,7 +2,7 @@
 
 import logging
 
-from incident_classification_agent.state import AgentState
+from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +16,17 @@ def _format_success(state: AgentState) -> str:
     Returns:
         Mensagem de resposta formatada como string.
     """
+    category = state.get("category")
+    severity = state.get("severity")
+    category_str = category.value if hasattr(category, "value") else str(category) if category else "N/A"
+    severity_str = severity.value if hasattr(severity, "value") else str(severity) if severity else "N/A"
+
     lines = [
         "✅ Ocorrência registrada com sucesso.",
         "",
         f"🆔 ID: {state.get('occurrence_id', 'N/A')}",
-        f"📁 Categoria: {state.get('category', 'N/A')}",
-        f"⚠️  Severidade: {state.get('severity', 'N/A')}",
+        f"📁 Categoria: {category_str}",
+        f"⚠️  Severidade: {severity_str}",
     ]
 
     if state.get("apartment"):

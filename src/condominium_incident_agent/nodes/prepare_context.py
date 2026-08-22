@@ -3,8 +3,8 @@
 import logging
 from pathlib import Path
 
-from incident_classification_agent.session import load_session
-from incident_classification_agent.state import AgentState
+from condominium_incident_agent.session import load_session
+from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
 
@@ -23,45 +23,29 @@ def _load_prompt_template() -> str:
     return _PROMPT_PATH.read_text(encoding="utf-8")
 
 
-def _build_session_context(apartment: str | None, building: str | None) -> str:
+def _build_session_context() -> str:
     """Constrói o texto de contexto histórico para injeção no prompt.
 
-    Consulta o session.json diretamente (sem passar pelo LLM) para montar
-    o contexto antes da classificação. O LLM ainda pode chamar
-    get_session_history durante a classificação para consultas adicionais.
-
-    Args:
-        apartment: Número do apartamento extraído do estado.
-        building: Bloco/torre extraído do estado.
+    Neste ponto do fluxo o apartamento ainda não foi extraído pelo LLM —
+    isso só ocorre durante ``classify_incident``. Por isso, o contexto
+    pré-injetado exibe o total de ocorrências da sessão sem filtrar por
+    apartamento, orientando o LLM a usar a tool ``get_session_history``
+    para consultas específicas por unidade.
 
     Returns:
-        Texto formatado com o histórico ou mensagem de ausência de histórico.
+        Texto informando o total de ocorrências na sessão corrente, ou
+        mensagem indicando que a sessão está vazia.
     """
-    if not apartment:
-        return "Nenhuma ocorrência anterior registrada para este apartamento nesta sessão."
-
     records = load_session()
-    matches = [
-        r for r in records
-        if r.get("apartment", "").strip().lower() == apartment.strip().lower()
-        and (
-            building is None
-            or r.get("building", "").strip().lower() == (building or "").strip().lower()
-        )
-    ]
+    if not records:
+        return "Nenhuma ocorrência registrada nesta sessão até o momento."
 
-    if not matches:
-        return "Nenhuma ocorrência anterior registrada para este apartamento nesta sessão."
-
-    lines = [f"{len(matches)} ocorrência(s) anterior(es) para o apartamento {apartment}:"]
-    for idx, rec in enumerate(matches, 1):
-        lines.append(
-            f"  {idx}. [{rec.get('reported_at', 'N/A')}] "
-            f"Categoria: {rec.get('category', 'N/A')} | "
-            f"Severidade: {rec.get('severity', 'N/A')} | "
-            f"Resumo: {rec.get('summary', 'N/A')}"
-        )
-    return "\n".join(lines)
+    total = len(records)
+    return (
+        f"{total} ocorrência(s) registrada(s) nesta sessão. "
+        "Use a tool get_session_history para consultar o histórico "
+        "de um apartamento específico e verificar reincidências."
+    )
 
 
 def prepare_context(state: AgentState) -> AgentState:
@@ -79,10 +63,7 @@ def prepare_context(state: AgentState) -> AgentState:
     """
     template = _load_prompt_template()
 
-    session_context = _build_session_context(
-        state.get("apartment"),
-        state.get("building"),
-    )
+    session_context = _build_session_context()
 
     prompt = template.replace("{user_input}", state["user_input"])
     prompt = prompt.replace("{reported_by}", state["reported_by"])

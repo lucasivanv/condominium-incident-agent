@@ -2,7 +2,7 @@
 
 from typing import TypedDict
 
-from incident_classification_agent.enums import Category, Severity
+from condominium_incident_agent.enums import Category, Severity
 
 
 class AgentState(TypedDict):
