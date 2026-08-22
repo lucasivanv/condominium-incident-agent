@@ -38,11 +38,14 @@ def _build_session_context(apartment: str | None, building: str | None) -> str:
         Texto formatado com o histórico ou mensagem de ausência de histórico.
     """
     if not apartment:
-        return "Nenhuma ocorrência anterior registrada para este apartamento nesta sessão."
+        return (
+            "Nenhuma ocorrência anterior registrada para este apartamento nesta sessão."
+        )
 
     records = load_session()
     matches = [
-        r for r in records
+        r
+        for r in records
         if r.get("apartment", "").strip().lower() == apartment.strip().lower()
         and (
             building is None
@@ -51,9 +54,13 @@ def _build_session_context(apartment: str | None, building: str | None) -> str:
     ]
 
     if not matches:
-        return "Nenhuma ocorrência anterior registrada para este apartamento nesta sessão."
+        return (
+            "Nenhuma ocorrência anterior registrada para este apartamento nesta sessão."
+        )
 
-    lines = [f"{len(matches)} ocorrência(s) anterior(es) para o apartamento {apartment}:"]
+    lines = [
+        f"{len(matches)} ocorrência(s) anterior(es) para o apartamento {apartment}:"
+    ]
     for idx, rec in enumerate(matches, 1):
         lines.append(
             f"  {idx}. [{rec.get('reported_at', 'N/A')}] "

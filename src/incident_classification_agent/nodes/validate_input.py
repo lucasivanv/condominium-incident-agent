@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from langchain_core.messages import HumanMessage
 
@@ -56,7 +56,9 @@ def _route_after_validate(state: AgentState) -> str:
         Nome do próximo nó: ``"prepare_context"`` ou ``"generate_response"``.
     """
     if state.get("multiple_incidents_detected"):
-        logger.warning("Multiple incidents detected — short-circuiting to generate_response.")
+        logger.warning(
+            "Multiple incidents detected — short-circuiting to generate_response."
+        )
         return "generate_response"
     return "prepare_context"
 
@@ -89,7 +91,7 @@ def validate_input(state: AgentState) -> AgentState:
     if not reported_by:
         raise ValueError("O campo 'reported_by' é obrigatório.")
 
-    reported_at = state.get("reported_at") or datetime.now(tz=timezone.utc).isoformat()
+    reported_at = state.get("reported_at") or datetime.now(tz=UTC).isoformat()
     occurrence_id = state.get("occurrence_id") or str(uuid.uuid4())
 
     multiple_incidents_detected = _detect_multiple_incidents(user_input)

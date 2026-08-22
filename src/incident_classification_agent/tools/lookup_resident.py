@@ -52,13 +52,17 @@ def lookup_resident(apartment: str, building: str | None = None) -> dict:
     residents = _load_residents()
 
     for resident in residents:
-        apt_match = resident.get("apartment", "").strip().lower() == apartment.strip().lower()
+        apt_match = (
+            resident.get("apartment", "").strip().lower() == apartment.strip().lower()
+        )
         building_match = (
             building is None
             or resident.get("building", "").strip().lower() == building.strip().lower()
         )
         if apt_match and building_match:
-            logger.info("Resident found for apartment %s / building %s", apartment, building)
+            logger.info(
+                "Resident found for apartment %s / building %s", apartment, building
+            )
             return {
                 "found": True,
                 "apartment": resident.get("apartment"),

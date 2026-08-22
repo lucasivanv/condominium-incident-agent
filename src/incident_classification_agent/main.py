@@ -65,8 +65,12 @@ def main() -> None:
         python -m incident_classification_agent.main examples/input.json
     """
     if len(sys.argv) != 2:
-        print("Uso: python -m incident_classification_agent.main <caminho/para/input.json>")
-        print("Exemplo: python -m incident_classification_agent.main examples/input.json")
+        print(
+            "Uso: python -m incident_classification_agent.main <caminho/para/input.json>"
+        )
+        print(
+            "Exemplo: python -m incident_classification_agent.main examples/input.json"
+        )
         sys.exit(1)
 
     try:

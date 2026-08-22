@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from incident_classification_agent.session import append_to_session
@@ -44,7 +44,7 @@ def save_occurrence(state: AgentState) -> AgentState:
     category = state.get("category")
     severity = state.get("severity")
 
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
     filename = f"{timestamp}_{occurrence_id}.json"
 
     payload = {
@@ -59,11 +59,13 @@ def save_occurrence(state: AgentState) -> AgentState:
         "building": state.get("building"),
         "summary": state.get("summary"),
         "resident_info": state.get("resident_info"),
-        "saved_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "saved_at": datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
     output_path = REPORTS_DIR / filename
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     logger.info("Occurrence saved to %s", output_path)
 
     # Entrada resumida para o histórico de sessão — usada por get_session_history
@@ -96,10 +98,11 @@ def save_occurrence(state: AgentState) -> AgentState:
         escalated_payload = {
             **payload,
             "escalated": True,
-            "escalated_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "escalated_at": datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         escalated_path.write_text(
-            json.dumps(escalated_payload, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(escalated_payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
         logger.warning("HIGH severity — occurrence escalated to %s", escalated_path)
         result["escalated_file"] = str(escalated_path)

@@ -43,7 +43,9 @@ def save_occurrence(
         - ``category``, ``severity``, ``summary``, ``involved_people``,
           ``apartment``, ``building``.
     """
-    logger.info("save_occurrence tool called — category: %s, severity: %s", category, severity)
+    logger.info(
+        "save_occurrence tool called — category: %s, severity: %s", category, severity
+    )
 
     # Retorna apenas os campos classificados; o nó save_occurrence
     # é responsável por injetar os dados de contexto e gravar em disco.
