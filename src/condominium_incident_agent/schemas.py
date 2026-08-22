@@ -5,7 +5,7 @@ fornecer, quais são obrigatórios, quais têm defaults e quais as regras
 de validação aplicadas antes do processamento.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -36,7 +36,7 @@ class IncidentInput(BaseModel):
         description="Nome de quem está reportando o incidente.",
     )
     reported_at: datetime = Field(
-        default_factory=lambda: datetime.now(tz=timezone.utc),
+        default_factory=lambda: datetime.now(tz=UTC),
         description="Data e hora do incidente em ISO 8601. Default: momento atual em UTC.",
     )
 
@@ -72,7 +72,9 @@ class IncidentInput(BaseModel):
         return {
             "user_input": self.user_input.strip(),
             "reported_by": self.reported_by.strip(),
-            "reported_at": self.reported_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "reported_at": self.reported_at.astimezone(UTC).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
             "occurrence_id": None,
             "category": None,
             "severity": None,

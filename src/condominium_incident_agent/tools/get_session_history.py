@@ -37,22 +37,29 @@ def get_session_history(apartment: str, building: str | None = None) -> dict:
 
     matches = []
     for record in records:
-        apt_match = record.get("apartment", "").strip().lower() == apartment.strip().lower()
+        apt_match = (
+            record.get("apartment", "").strip().lower() == apartment.strip().lower()
+        )
         building_match = (
             building is None
-            or record.get("building", "").strip().lower() == (building or "").strip().lower()
+            or record.get("building", "").strip().lower()
+            == (building or "").strip().lower()
         )
         if apt_match and building_match:
-            matches.append({
-                "occurrence_id": record.get("occurrence_id"),
-                "reported_at": record.get("reported_at"),
-                "category": record.get("category"),
-                "severity": record.get("severity"),
-                "summary": record.get("summary"),
-            })
+            matches.append(
+                {
+                    "occurrence_id": record.get("occurrence_id"),
+                    "reported_at": record.get("reported_at"),
+                    "category": record.get("category"),
+                    "severity": record.get("severity"),
+                    "summary": record.get("summary"),
+                }
+            )
 
     if not matches:
-        logger.info("No session history for apartment %s / building %s", apartment, building)
+        logger.info(
+            "No session history for apartment %s / building %s", apartment, building
+        )
         return {
             "found": False,
             "apartment": apartment,

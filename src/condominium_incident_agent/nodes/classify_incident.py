@@ -58,7 +58,9 @@ def _route_after_classify(state: AgentState) -> str:
         Nome do próximo nó: ``"save_occurrence"`` ou ``"handle_error"``.
     """
     if state.get("classification_error"):
-        logger.warning("Routing to handle_error — reason: %s", state["classification_error"])
+        logger.warning(
+            "Routing to handle_error — reason: %s", state["classification_error"]
+        )
         return "handle_error"
     return "save_occurrence"
 
@@ -109,7 +111,11 @@ def classify_incident(state: AgentState) -> AgentState:
         for tm in tool_messages:
             messages.append(tm)
             try:
-                result = json.loads(tm.content) if isinstance(tm.content, str) else tm.content
+                result = (
+                    json.loads(tm.content)
+                    if isinstance(tm.content, str)
+                    else tm.content
+                )
             except (json.JSONDecodeError, TypeError):
                 result = {}
 
