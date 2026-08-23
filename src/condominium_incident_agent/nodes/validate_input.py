@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 
 from langchain_core.messages import HumanMessage
 
-from incident_classification_agent.llm import get_llm
-from incident_classification_agent.state import AgentState
+from condominium_incident_agent.llm import get_llm
+from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
 
@@ -26,20 +26,30 @@ Relato:
 def _detect_multiple_incidents(user_input: str) -> bool:
     """Consulta o LLM para verificar se o relato contém múltiplos incidentes.
 
+    Em caso de falha na chamada ao LLM (rede, timeout, modelo indisponível),
+    assume conservadoramente que há um único incidente e registra um aviso,
+    permitindo que o fluxo principal continue sem interrupção.
+
     Args:
         user_input: Texto do relato a ser analisado.
 
     Returns:
-        True se múltiplos incidentes forem detectados, False caso contrário.
+        True se múltiplos incidentes forem detectados, False caso contrário
+        ou em caso de falha na detecção.
     """
-    llm = get_llm()
-    prompt = _DETECTION_PROMPT.format(user_input=user_input)
-    response = llm.invoke([HumanMessage(content=prompt)])
-    answer = response.content.strip().upper()
-
-    logger.info("Multiple incidents detection result: %s", answer)
-
-    return "MULTIPLE" in answer
+    try:
+        llm = get_llm()
+        prompt = _DETECTION_PROMPT.format(user_input=user_input)
+        response = llm.invoke([HumanMessage(content=prompt)])
+        answer = response.content.strip().upper()
+        logger.info("Multiple incidents detection result: %s", answer)
+        return "MULTIPLE" in answer
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Multiple incidents detection failed (%s). Assuming single incident.",
+            exc,
+        )
+        return False
 
 
 def _route_after_validate(state: AgentState) -> str:

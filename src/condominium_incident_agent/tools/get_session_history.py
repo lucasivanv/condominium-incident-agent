@@ -4,7 +4,7 @@ import logging
 
 from langchain_core.tools import tool
 
-from incident_classification_agent.session import load_session
+from condominium_incident_agent.session import load_session
 
 logger = logging.getLogger(__name__)
 

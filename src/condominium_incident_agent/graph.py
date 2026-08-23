@@ -5,19 +5,19 @@ import logging
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from incident_classification_agent.nodes.classify_incident import (
+from condominium_incident_agent.nodes.classify_incident import (
     _route_after_classify,
     classify_incident,
 )
-from incident_classification_agent.nodes.generate_response import generate_response
-from incident_classification_agent.nodes.handle_error import handle_error
-from incident_classification_agent.nodes.prepare_context import prepare_context
-from incident_classification_agent.nodes.save_occurrence import save_occurrence
-from incident_classification_agent.nodes.validate_input import (
+from condominium_incident_agent.nodes.generate_response import generate_response
+from condominium_incident_agent.nodes.handle_error import handle_error
+from condominium_incident_agent.nodes.prepare_context import prepare_context
+from condominium_incident_agent.nodes.save_occurrence import save_occurrence
+from condominium_incident_agent.nodes.validate_input import (
     _route_after_validate,
     validate_input,
 )
-from incident_classification_agent.state import AgentState
+from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
 

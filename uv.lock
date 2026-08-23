@@ -159,7 +159,7 @@ wheels = [
 ]
 
 [[package]]
-name = "incident-classification-agent"
+name = "condominium-incident-agent"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

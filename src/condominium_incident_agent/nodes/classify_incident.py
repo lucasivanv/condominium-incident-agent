@@ -6,11 +6,11 @@ import logging
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
-from incident_classification_agent.enums import Category, Severity
-from incident_classification_agent.llm import get_llm
-from incident_classification_agent.state import AgentState
-from incident_classification_agent.tools.get_session_history import get_session_history
-from incident_classification_agent.tools.lookup_resident import lookup_resident
+from condominium_incident_agent.enums import Category, Severity
+from condominium_incident_agent.llm import get_llm
+from condominium_incident_agent.state import AgentState
+from condominium_incident_agent.tools.get_session_history import get_session_history
+from condominium_incident_agent.tools.lookup_resident import lookup_resident
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def _route_after_classify(state: AgentState) -> str:
 def classify_incident(state: AgentState) -> AgentState:
     """Envia o prompt ao LLM com tools disponíveis e extrai a classificação.
 
-    O LLM recebe as tools ``lookup_resident`` e ``save_occurrence`` via
+    O LLM recebe as tools ``lookup_resident`` e ``get_session_history`` via
     ``bind_tools``. Quando o modelo emite tool calls, elas são executadas
     pelo ``ToolNode`` e o resultado é repassado de volta ao LLM para que
     ele incorpore as informações antes de produzir a classificação final.
@@ -97,7 +97,7 @@ def classify_incident(state: AgentState) -> AgentState:
     resident_info: dict | None = None
 
     # Agentic loop: continua enquanto o LLM emitir tool calls
-    for _ in range(5):  # limite de segurança para evitar loop infinito
+    for iteration in range(5):  # limite de segurança para evitar loop infinito
         ai_message: AIMessage = llm_with_tools.invoke(messages)
         messages.append(ai_message)
 
@@ -122,6 +122,13 @@ def classify_incident(state: AgentState) -> AgentState:
             tool_name = tm.name if hasattr(tm, "name") else ""
             if tool_name == "lookup_resident":
                 resident_info = result if result.get("found") else None
+    else:
+        # Loop esgotou as 5 iterações sem produzir resposta final
+        logger.warning(
+            "Agentic loop exhausted 5 iterations without a final response "
+            "for occurrence_id: %s",
+            state.get("occurrence_id"),
+        )
 
     raw = ai_message.content
     logger.debug("LLM final response: %s", raw)
