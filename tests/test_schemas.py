@@ -1,5 +1,7 @@
 """Unit tests for schemas, enums, and state — no LLM or Ollama required."""
 
+from unittest.mock import patch
+
 import pytest
 from pydantic import ValidationError
 
@@ -66,7 +68,10 @@ class TestIncidentInput:
 
     def test_to_initial_state_defaults(self):
         obj = IncidentInput(user_input="  Teste  ", reported_by="  Porteiro  ")
-        state = obj.to_initial_state()
+        with patch(
+            "condominium_incident_agent.schemas.load_session", return_value=[]
+        ):
+            state = obj.to_initial_state()
         assert state["user_input"] == "Teste"
         assert state["reported_by"] == "Porteiro"
         assert state["occurrence_id"] is None

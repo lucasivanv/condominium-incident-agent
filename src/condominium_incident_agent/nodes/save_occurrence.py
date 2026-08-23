@@ -2,6 +2,8 @@
 
 import json
 import logging
+import os
+import tempfile
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,6 +16,25 @@ logger = logging.getLogger(__name__)
 _BASE_DIR = Path(__file__).parent.parent.parent.parent
 REPORTS_DIR = _BASE_DIR / "reports"
 ESCALATED_DIR = REPORTS_DIR / "escalated"
+
+
+def _write_json_atomic(path: Path, payload: dict) -> None:
+    """Escreve um JSON e substitui o destino somente após concluir a escrita."""
+    fd, tmp_path = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            json.dump(payload, file, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def save_occurrence(state: AgentState) -> AgentState:
@@ -63,7 +84,7 @@ def save_occurrence(state: AgentState) -> AgentState:
     }
 
     output_path = REPORTS_DIR / filename
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_json_atomic(output_path, payload)
     logger.info("Occurrence saved to %s", output_path)
 
     # Entrada resumida para o histórico de sessão — usada por get_session_history
@@ -98,9 +119,7 @@ def save_occurrence(state: AgentState) -> AgentState:
             "escalated": True,
             "escalated_at": datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
-        escalated_path.write_text(
-            json.dumps(escalated_payload, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        _write_json_atomic(escalated_path, escalated_payload)
         logger.warning("HIGH severity — occurrence escalated to %s", escalated_path)
         result["escalated_file"] = str(escalated_path)
 

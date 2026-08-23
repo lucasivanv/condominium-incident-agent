@@ -76,6 +76,21 @@ def _mock_llm_chain(response_text: str, tool_calls: list | None = None) -> Magic
 
 
 class TestClassifyIncident:
+    def test_classification_uses_prepared_context_as_latest_message(self):
+        """O classificador deve enviar o prompt preparado ao LLM."""
+        prepared_prompt = "Relato atual\nHistórico anterior: reincidência de NOISE"
+        state = _make_state(conversation_history=[prepared_prompt])
+        mock_llm = _mock_llm_chain(_valid_llm_response("NOISE", "HIGH"))
+
+        with patch(
+            "condominium_incident_agent.nodes.classify_incident.get_llm",
+            return_value=mock_llm,
+        ):
+            classify_incident(state)
+
+        sent_messages = mock_llm.bind_tools.return_value.with_retry.return_value.invoke.call_args.args[0]
+        assert sent_messages[0].content == prepared_prompt
+
     def test_valid_response_populates_category_and_severity(self):
         """Resposta válida do LLM deve preencher category e severity."""
         state = _make_state()
