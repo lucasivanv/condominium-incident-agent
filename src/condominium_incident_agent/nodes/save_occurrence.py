@@ -59,6 +59,20 @@ def save_occurrence(state: AgentState) -> AgentState:
         Estado atualizado com ``output_file``, ``escalated_file`` e
         ``session_history`` refletindo o acumulado da sessão corrente.
     """
+    try:
+        return _save_occurrence(state)
+    except (OSError, ValueError, TypeError) as exc:
+        error = f"Falha controlada ao persistir a ocorrência: {type(exc).__name__}."
+        logger.exception("Occurrence persistence failed for %s", state.get("occurrence_id"))
+        return {
+            **state,
+            "classification_error": error,
+            "output_file": None,
+            "escalated_file": None,
+        }
+
+
+def _save_occurrence(state: AgentState) -> AgentState:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
     occurrence_id = state.get("occurrence_id") or str(uuid.uuid4())

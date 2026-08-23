@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from condominium_incident_agent.enums import Category, Severity
-from condominium_incident_agent.llm import get_llm
+from condominium_incident_agent.llm import get_llm, with_llm_retry
 from condominium_incident_agent.state import AgentState
 from condominium_incident_agent.tools.get_session_history import get_session_history
 from condominium_incident_agent.tools.lookup_resident import lookup_resident
@@ -86,43 +86,48 @@ def classify_incident(state: AgentState) -> AgentState:
     prompt_text = history[-1] if history else state["user_input"]
 
     llm = get_llm()
-    llm_with_tools = llm.bind_tools(TOOLS).with_retry(
-        stop_after_attempt=3,
-        wait_exponential_jitter=True,
-    )
+    llm_with_tools = with_llm_retry(llm.bind_tools(TOOLS))
 
     messages = [HumanMessage(content=prompt_text)]
     resident_info: dict | None = None
+    ai_message: AIMessage | None = None
 
     # Agentic loop: continua enquanto o LLM emitir tool calls
-    for iteration in range(5):  # limite de segurança para evitar loop infinito
-        ai_message: AIMessage = llm_with_tools.invoke(messages)
-        messages.append(ai_message)
+    try:
+        for iteration in range(5):  # limite de segurança para evitar loop infinito
+            ai_message = llm_with_tools.invoke(messages)
+            messages.append(ai_message)
 
-        if not ai_message.tool_calls:
-            break
+            if not ai_message.tool_calls:
+                break
 
-        # Executa cada tool call emitida pelo LLM
-        tool_results = tool_node.invoke({"messages": messages})
-        tool_messages: list[ToolMessage] = tool_results["messages"]
+            # Tools locais são determinísticas; falha vira erro controlado,
+            # sem repetir operações que podem ter efeitos colaterais.
+            tool_results = tool_node.invoke({"messages": messages})
+            tool_messages: list[ToolMessage] = tool_results["messages"]
 
-        for tm in tool_messages:
-            messages.append(tm)
-            try:
-                result = json.loads(tm.content) if isinstance(tm.content, str) else tm.content
-            except (json.JSONDecodeError, TypeError):
-                result = {}
+            for tm in tool_messages:
+                messages.append(tm)
+                try:
+                    result = json.loads(tm.content) if isinstance(tm.content, str) else tm.content
+                except (json.JSONDecodeError, TypeError):
+                    result = {}
 
-            tool_name = tm.name if hasattr(tm, "name") else ""
-            if tool_name == "lookup_resident":
-                resident_info = result if result.get("found") else None
-    else:
-        # Loop esgotou as 5 iterações sem produzir resposta final
-        logger.warning(
-            "Agentic loop exhausted 5 iterations without a final response "
-            "for occurrence_id: %s",
-            state.get("occurrence_id"),
-        )
+                tool_name = tm.name if hasattr(tm, "name") else ""
+                if tool_name == "lookup_resident":
+                    resident_info = result if result.get("found") else None
+        else:
+            raise RuntimeError("Limite de chamadas de tools atingido sem resposta final.")
+    except Exception as exc:
+        error = f"Falha na dependência externa durante a classificação: {type(exc).__name__}."
+        logger.exception("Classification dependency failed for %s", state.get("occurrence_id"))
+        return {
+            **state,
+            "category": None,
+            "severity": None,
+            "resident_info": resident_info,
+            "classification_error": error,
+        }
 
     raw = ai_message.content
     logger.debug("LLM final response: %s", raw)
