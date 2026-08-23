@@ -72,9 +72,7 @@ class IncidentInput(BaseModel):
         return {
             "user_input": self.user_input.strip(),
             "reported_by": self.reported_by.strip(),
-            "reported_at": self.reported_at.astimezone(UTC).strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
-            ),
+            "reported_at": self.reported_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "occurrence_id": None,
             "category": None,
             "severity": None,

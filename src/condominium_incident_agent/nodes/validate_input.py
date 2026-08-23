@@ -66,9 +66,7 @@ def _route_after_validate(state: AgentState) -> str:
         Nome do próximo nó: ``"prepare_context"`` ou ``"generate_response"``.
     """
     if state.get("multiple_incidents_detected"):
-        logger.warning(
-            "Multiple incidents detected — short-circuiting to generate_response."
-        )
+        logger.warning("Multiple incidents detected — short-circuiting to generate_response.")
         return "generate_response"
     return "prepare_context"
 
