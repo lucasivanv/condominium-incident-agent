@@ -5,8 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableLambda
 
 from condominium_incident_agent.enums import Category, Severity
+from condominium_incident_agent.llm import LLM_MAX_ATTEMPTS, with_llm_retry
 from condominium_incident_agent.nodes.classify_incident import (
     _extract_json,
     _route_after_classify,
@@ -76,6 +78,105 @@ def _mock_llm_chain(response_text: str, tool_calls: list | None = None) -> Magic
 
 
 class TestClassifyIncident:
+    def test_transient_llm_failure_recovers_on_retry(self):
+        attempts = 0
+
+        def flaky_call(_input):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise ConnectionError("temporary Ollama failure")
+            return "ok"
+
+        result = with_llm_retry(RunnableLambda(flaky_call)).invoke("input")
+
+        assert result == "ok"
+        assert attempts == 2
+
+    def test_llm_retry_stops_after_configured_attempts(self):
+        attempts = 0
+
+        def failing_call(_input):
+            nonlocal attempts
+            attempts += 1
+            raise TimeoutError("Ollama timeout")
+
+        with pytest.raises(TimeoutError):
+            with_llm_retry(RunnableLambda(failing_call)).invoke("input")
+
+        assert attempts == LLM_MAX_ATTEMPTS
+
+    def test_non_transient_llm_failure_is_not_retried(self):
+        attempts = 0
+
+        def invalid_call(_input):
+            nonlocal attempts
+            attempts += 1
+            raise ValueError("invalid request")
+
+        with pytest.raises(ValueError):
+            with_llm_retry(RunnableLambda(invalid_call)).invoke("input")
+
+        assert attempts == 1
+
+    def test_llm_failure_returns_controlled_error_without_classification(self):
+        state = _make_state()
+        mock_llm = MagicMock()
+        mock_llm.bind_tools.return_value.with_retry.return_value.invoke.side_effect = ConnectionError(
+            "Ollama unavailable"
+        )
+
+        with patch(
+            "condominium_incident_agent.nodes.classify_incident.get_llm",
+            return_value=mock_llm,
+        ):
+            result = classify_incident(state)
+
+        assert result["classification_error"] is not None
+        assert result["category"] is None
+        assert result["severity"] is None
+
+    def test_llm_timeout_returns_controlled_error(self):
+        state = _make_state()
+        mock_llm = MagicMock()
+        mock_llm.bind_tools.return_value.with_retry.return_value.invoke.side_effect = TimeoutError(
+            "Ollama request timed out"
+        )
+
+        with patch(
+            "condominium_incident_agent.nodes.classify_incident.get_llm",
+            return_value=mock_llm,
+        ):
+            result = classify_incident(state)
+
+        assert "TimeoutError" in result["classification_error"]
+        assert result["summary"] is None
+
+    def test_tool_failure_returns_controlled_error(self):
+        state = _make_state()
+        tool_call = {
+            "name": "lookup_resident",
+            "args": {"apartment": "302", "building": "A"},
+            "id": "call-1",
+            "type": "tool_call",
+        }
+        mock_llm = _mock_llm_chain("", [tool_call])
+
+        with (
+            patch(
+                "condominium_incident_agent.nodes.classify_incident.get_llm",
+                return_value=mock_llm,
+            ),
+            patch(
+                "condominium_incident_agent.nodes.classify_incident.tool_node.invoke",
+                side_effect=OSError("residents data unavailable"),
+            ),
+        ):
+            result = classify_incident(state)
+
+        assert result["classification_error"] is not None
+        assert result["category"] is None
+
     def test_classification_uses_prepared_context_as_latest_message(self):
         """O classificador deve enviar o prompt preparado ao LLM."""
         prepared_prompt = "Relato atual\nHistórico anterior: reincidência de NOISE"

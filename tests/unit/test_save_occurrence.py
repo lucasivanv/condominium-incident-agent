@@ -35,6 +35,21 @@ def _make_state(**kwargs) -> dict:
 
 
 class TestSaveOccurrence:
+    def test_persistence_failure_returns_controlled_error(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.REPORTS_DIR", tmp_path
+        )
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.append_to_session",
+            MagicMock(side_effect=OSError("session disk unavailable")),
+        )
+
+        result = save_occurrence(_make_state())
+
+        assert result["classification_error"] is not None
+        assert result["output_file"] is None
+        assert result["escalated_file"] is None
+
     def test_output_file_is_written_atomically(self, tmp_path, monkeypatch):
         """O relatório principal deve ser substituído após a escrita completa."""
         monkeypatch.setattr(
