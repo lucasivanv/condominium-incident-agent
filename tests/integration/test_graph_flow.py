@@ -10,6 +10,7 @@ Isso garante que o roteamento condicional, a passagem de estado entre nós
 e a lógica de negócio sejam exercitados de ponta a ponta sem servidor externo.
 """
 
+import importlib
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -579,3 +580,237 @@ class TestPersistence:
         data = json.loads(Path(result["output_file"]).read_text(encoding="utf-8"))
         assert data["reported_by"] == "Porteiro Carlos"
         assert data["reported_at"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Cenário 7 — Limites de contexto: histórico não cresce indefinidamente
+# ---------------------------------------------------------------------------
+
+
+class TestContextLimits:
+    def test_conversation_history_does_not_grow_unboundedly(self, patched_env):
+        """Após múltiplas invocações no mesmo thread, conversation_history deve
+        estar limitado a CONVERSATION_HISTORY_LIMIT + 1 entradas.
+
+        A lógica: prepare_context trunca o histórico ANTES de appendar o novo
+        prompt; depois classify_incident e generate_response appendam mais 2.
+        O resultado final não deve exceder CONVERSATION_HISTORY_LIMIT + 2.
+        """
+        from condominium_incident_agent.session import CONVERSATION_HISTORY_LIMIT
+
+        graph = build_graph()
+        config = _make_config()
+
+        last_result = None
+        for _ in range(CONVERSATION_HISTORY_LIMIT + 3):
+            state = _initial_state()
+            with (
+                patch(
+                    "condominium_incident_agent.nodes.validate_input.get_llm",
+                    return_value=_build_validate_llm_mock("SINGLE"),
+                ),
+                patch(
+                    "condominium_incident_agent.nodes.classify_incident.get_llm",
+                    return_value=_build_classify_llm_mock(_llm_response("NOISE", "LOW")),
+                ),
+            ):
+                last_result = graph.invoke(state, config=config)
+
+        history_len = len(last_result["conversation_history"])
+        # O histórico não pode ser maior do que o limite + as entradas geradas
+        # pelo próprio ciclo atual (prepare_context append + classify append + generate append = 3)
+        assert history_len <= CONVERSATION_HISTORY_LIMIT + 3
+
+    def test_session_history_in_state_reflects_all_processed_occurrences(
+        self, patched_env
+    ):
+        """session_history no estado deve acumular todas as ocorrências
+        bem-sucedidas processadas na sessão (via MemorySaver + session.json)."""
+        graph = build_graph()
+        config = _make_config()
+
+        for i in range(3):
+            state = _initial_state(user_input=f"Barulho excessivo no apartamento 30{i}")
+            with (
+                patch(
+                    "condominium_incident_agent.nodes.validate_input.get_llm",
+                    return_value=_build_validate_llm_mock("SINGLE"),
+                ),
+                patch(
+                    "condominium_incident_agent.nodes.classify_incident.get_llm",
+                    return_value=_build_classify_llm_mock(
+                        _llm_response("NOISE", "LOW", apartment=f"30{i}")
+                    ),
+                ),
+            ):
+                result = graph.invoke(state, config=config)
+
+        # Após 3 invocações, session_history deve ter pelo menos as 3 entradas
+        assert len(result["session_history"]) >= 3
+
+
+# ---------------------------------------------------------------------------
+# Cenário 8 — Persistência entre reinicializações (session_history pré-semeado)
+# ---------------------------------------------------------------------------
+
+
+class TestSessionHistoryPreSeeding:
+    def test_initial_state_seeds_session_history_from_disk(self, patched_env):
+        """to_initial_state() deve pré-semear session_history com dados do session.json.
+
+        Simula uma reinicialização do agente: session.json já contém registros
+        de execuções anteriores e o estado inicial deve refleti-los.
+        """
+        session_file = patched_env["session_file"]
+        session_file.parent.mkdir(parents=True, exist_ok=True)
+
+        pre_existing = [
+            {
+                "occurrence_id": "pre-uuid-1",
+                "reported_at": "2026-08-01T10:00:00Z",
+                "reported_by": "Porteiro Anterior",
+                "category": "ACCESS",
+                "severity": "LOW",
+                "summary": "Acesso registrado anteriormente.",
+                "apartment": "101",
+                "building": "A",
+            },
+            {
+                "occurrence_id": "pre-uuid-2",
+                "reported_at": "2026-08-02T10:00:00Z",
+                "reported_by": "Porteiro Anterior",
+                "category": "NOISE",
+                "severity": "MEDIUM",
+                "summary": "Barulho registrado anteriormente.",
+                "apartment": "202",
+                "building": "B",
+            },
+        ]
+        session_file.write_text(
+            json.dumps(pre_existing, ensure_ascii=False), encoding="utf-8"
+        )
+
+        # Instancia novo estado como se fosse uma nova execução do processo
+        incident = IncidentInput(
+            user_input="Nova ocorrência de barulho no apartamento 101",
+            reported_by="Porteiro Novo",
+        )
+        state = incident.to_initial_state()
+
+        # session_history já deve conter os dados do disco
+        assert len(state["session_history"]) == 2
+        ids = [e["occurrence_id"] for e in state["session_history"]]
+        assert "pre-uuid-1" in ids
+        assert "pre-uuid-2" in ids
+
+    def test_session_history_from_disk_available_during_processing(self, patched_env):
+        """Ocorrências pré-existentes no session.json devem estar disponíveis
+        ao longo do processamento — inclusive na tool get_session_history."""
+        session_file = patched_env["session_file"]
+        session_file.parent.mkdir(parents=True, exist_ok=True)
+
+        pre_existing = [
+            {
+                "occurrence_id": "old-uuid",
+                "reported_at": "2026-08-01T10:00:00Z",
+                "reported_by": "Porteiro Antigo",
+                "category": "NOISE",
+                "severity": "LOW",
+                "summary": "Barulho anterior.",
+                "apartment": "302",
+                "building": "A",
+            }
+        ]
+        session_file.write_text(
+            json.dumps(pre_existing, ensure_ascii=False), encoding="utf-8"
+        )
+
+        graph = build_graph()
+        # Nova invocação com mesmo apartamento
+        state = _initial_state(user_input="Barulho excessivo no apartamento 302")
+        config = _make_config()
+
+        with (
+            patch(
+                "condominium_incident_agent.nodes.validate_input.get_llm",
+                return_value=_build_validate_llm_mock("SINGLE"),
+            ),
+            patch(
+                "condominium_incident_agent.nodes.classify_incident.get_llm",
+                return_value=_build_classify_llm_mock(
+                    _llm_response("NOISE", "MEDIUM")
+                ),
+            ),
+        ):
+            result = graph.invoke(state, config=config)
+
+        # Após a execução, session.json deve ter 2 registros (1 pré-existente + 1 novo)
+        records = json.loads(session_file.read_text(encoding="utf-8"))
+        assert len(records) == 2
+        occurrence_ids = [r["occurrence_id"] for r in records]
+        assert "old-uuid" in occurrence_ids
+        assert result["occurrence_id"] in occurrence_ids
+
+    def test_context_prompt_mentions_prior_occurrences_of_same_apartment(
+        self, patched_env
+    ):
+        """O prompt enviado ao LLM deve mencionar ocorrências pré-existentes do
+        mesmo apartamento quando o relato o menciona."""
+        session_file = patched_env["session_file"]
+        session_file.parent.mkdir(parents=True, exist_ok=True)
+
+        pre_existing = [
+            {
+                "occurrence_id": "hist-uuid",
+                "reported_at": "2026-08-01T10:00:00Z",
+                "reported_by": "Porteiro X",
+                "category": "NOISE",
+                "severity": "LOW",
+                "summary": "Primeira ocorrência de ruído.",
+                "apartment": "302",
+                "building": "A",
+            }
+        ]
+        session_file.write_text(
+            json.dumps(pre_existing, ensure_ascii=False), encoding="utf-8"
+        )
+
+        state = _initial_state(user_input="Barulho novamente no apartamento 302")
+        config = _make_config()
+
+        captured_prompts: list[str] = []
+
+        original_prepare = None
+
+        def capture_prepare(s):
+            nonlocal original_prepare
+            result_s = original_prepare(s)
+            captured_prompts.extend(result_s.get("conversation_history", []))
+            return result_s
+
+        pc_module = importlib.import_module(
+            "condominium_incident_agent.nodes.prepare_context"
+        )
+
+        original_prepare = pc_module.prepare_context
+
+        with (
+            patch(
+                "condominium_incident_agent.graph.prepare_context",
+                side_effect=capture_prepare,
+            ),
+            patch(
+                "condominium_incident_agent.nodes.validate_input.get_llm",
+                return_value=_build_validate_llm_mock("SINGLE"),
+            ),
+            patch(
+                "condominium_incident_agent.nodes.classify_incident.get_llm",
+                return_value=_build_classify_llm_mock(_llm_response("NOISE", "MEDIUM")),
+            ),
+        ):
+            graph = build_graph()
+            graph.invoke(state, config=config)
+
+        # Pelo menos um dos prompts capturados deve mencionar ocorrência do apt 302
+        combined = "\n".join(captured_prompts)
+        assert "302" in combined

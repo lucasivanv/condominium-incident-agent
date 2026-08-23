@@ -1,5 +1,8 @@
 # Estratégia de Testes — condominium-incident-agent
 
+**Data da auditoria:** 2026-08-22
+**Ambiente:** Windows 11, Python 3.12.13, uv, pytest 9.1.1
+
 ## Visão Geral
 
 O projeto utiliza **pytest** como framework de testes, organizado em duas camadas:
@@ -35,17 +38,17 @@ Usam `unittest.mock.patch` para substituir:
 - **session.json** — `load_session` e `append_to_session` mockados ou redirecionados
 - **residents.json** — `_load_residents` mockado com fixtures internas
 
-| Arquivo | Componente | Foco |
-|---|---|---|
-| `test_validate_input.py` | Nó `validate_input` | Validação de campos, geração de UUID, detecção de múltiplos incidentes, fallback de LLM |
-| `test_prepare_context.py` | Nó `prepare_context` | Substituição de variáveis no template, construção do contexto de sessão |
-| `test_classify_incident.py` | Nó `classify_incident` | Parse de JSON, validação de enums, loop agentic, roteamento pós-classificação |
-| `test_generate_response.py` | Nó `generate_response` | Formatação de mensagens de sucesso, erro e múltiplos incidentes |
-| `test_save_occurrence.py` | Nó `save_occurrence` | Criação de arquivos, lógica de escalamento HIGH, atualização do session_history |
-| `test_handle_error.py` | Nó `handle_error` | Passagem de estado sem alteração |
-| `test_session.py` | Módulo `session` | Leitura e escrita do session.json, resiliência a falhas |
-| `test_lookup_resident.py` | Tool `lookup_resident` | Busca case-insensitive, filtro por bloco, retorno de dados completos |
-| `test_get_session_history.py` | Tool `get_session_history` | Filtragem por apartamento/bloco, contagem, campos do retorno |
+| Arquivo                       | Componente                 | Foco                                                                                    |
+| ----------------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
+| `test_validate_input.py`      | Nó `validate_input`        | Validação de campos, geração de UUID, detecção de múltiplos incidentes, fallback de LLM |
+| `test_prepare_context.py`     | Nó `prepare_context`       | Substituição de variáveis no template, construção do contexto de sessão                 |
+| `test_classify_incident.py`   | Nó `classify_incident`     | Parse de JSON, validação de enums, loop agentic, roteamento pós-classificação           |
+| `test_generate_response.py`   | Nó `generate_response`     | Formatação de mensagens de sucesso, erro e múltiplos incidentes                         |
+| `test_save_occurrence.py`     | Nó `save_occurrence`       | Criação de arquivos, lógica de escalamento HIGH, atualização do session_history         |
+| `test_handle_error.py`        | Nó `handle_error`          | Passagem de estado sem alteração                                                        |
+| `test_session.py`             | Módulo `session`           | Leitura e escrita do session.json, resiliência a falhas                                 |
+| `test_lookup_resident.py`     | Tool `lookup_resident`     | Busca case-insensitive, filtro por bloco, retorno de dados completos                    |
+| `test_get_session_history.py` | Tool `get_session_history` | Filtragem por apartamento/bloco, contagem, campos do retorno                            |
 
 ### Testes de Integração
 
@@ -56,30 +59,36 @@ Localizados em `tests/integration/test_graph_flow.py`, executam o grafo LangGrap
 ## Cenários Cobertos
 
 ### Ocorrência Válida
+
 - Fluxo completo com severidade LOW e MEDIUM
 - Campos do arquivo JSON gerado validados (category, severity, apartment, etc.)
 - occurrence_id presente no estado final
 
 ### Ocorrência Crítica (HIGH)
+
 - Arquivo criado em `reports/escalated/` com flag `escalated: true`
 - Relatório principal também salvo normalmente
 
 ### Entrada Inválida — Múltiplos Incidentes
+
 - LLM detecta MULTIPLE → `multiple_incidents_detected=True`
 - Fluxo encurta para `generate_response` sem chamar `classify_incident`
 - Nenhum arquivo de ocorrência criado, `category` permanece `None`
 
 ### Falha de Dependência — LLM sem JSON válido
+
 - Resposta inválida do LLM → `classification_error` preenchido
 - Roteamento para `handle_error` → `generate_response`
 - Sem arquivo persistido, sem entrada no session.json
 
 ### Uso de Histórico
+
 - `session_history` atualizado em memória após ocorrência bem-sucedida
 - `prepare_context` lê registros existentes no session.json
 - Após falha de classificação, session_history permanece vazio
 
 ### Persistência
+
 - `session.json` gravado após ocorrência bem-sucedida
 - `session.json` não modificado após falha de classificação
 - Arquivo de relatório contém `reported_by` e `reported_at`
@@ -89,6 +98,7 @@ Localizados em `tests/integration/test_graph_flow.py`, executam o grafo LangGrap
 ## Estratégia de Mock
 
 ### LLM
+
 ```python
 # validate_input
 with patch("condominium_incident_agent.nodes.validate_input.get_llm",
@@ -103,6 +113,7 @@ with patch("condominium_incident_agent.nodes.classify_incident.get_llm",
 ```
 
 ### Filesystem
+
 ```python
 # Redireciona diretórios de relatórios para tmp_path
 monkeypatch.setattr("condominium_incident_agent.nodes.save_occurrence.REPORTS_DIR", tmp_path)
@@ -110,6 +121,7 @@ monkeypatch.setattr("condominium_incident_agent.session.SESSION_FILE", tmp_path 
 ```
 
 ### Tools
+
 ```python
 # Mock direto da função de carregamento de dados
 with patch("condominium_incident_agent.tools.lookup_resident._load_residents",

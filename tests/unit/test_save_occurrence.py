@@ -1,6 +1,7 @@
 """Testes unitários para o nó save_occurrence."""
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -34,6 +35,36 @@ def _make_state(**kwargs) -> dict:
 
 
 class TestSaveOccurrence:
+    def test_output_file_is_written_atomically(self, tmp_path, monkeypatch):
+        """O relatório principal deve ser substituído após a escrita completa."""
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.REPORTS_DIR", tmp_path
+        )
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.ESCALATED_DIR",
+            tmp_path / "escalated",
+        )
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.append_to_session",
+            MagicMock(),
+        )
+        replace_calls: list[tuple[str, str]] = []
+        original_replace = os.replace
+
+        def spy_replace(source: str, destination: str) -> None:
+            replace_calls.append((source, destination))
+            original_replace(source, destination)
+
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.os.replace",
+            spy_replace,
+        )
+
+        result = save_occurrence(_make_state())
+
+        assert len(replace_calls) == 1
+        assert Path(replace_calls[0][1]) == Path(result["output_file"])
+
     def test_output_file_created_with_correct_content(self, tmp_path, monkeypatch):
         """O arquivo JSON da ocorrência deve ser criado com os dados corretos."""
         monkeypatch.setattr(

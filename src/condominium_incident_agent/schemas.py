@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from condominium_incident_agent.session import load_session
+
 
 class IncidentInput(BaseModel):
     """Dados de entrada fornecidos pelo usuário para registro de um incidente.
@@ -66,6 +68,11 @@ class IncidentInput(BaseModel):
         Preenche todos os campos do AgentState com seus valores iniciais,
         deixando os campos de saída do agente como None ou listas vazias.
 
+        ``session_history`` é pré-semeado com o conteúdo atual do
+        ``session.json`` para que o estado em memória reflita o histórico
+        persistido em disco desde o início do processamento — inclusive
+        quando o agente é reiniciado entre ocorrências.
+
         Returns:
             Dicionário compatível com AgentState pronto para invocar o grafo.
         """
@@ -86,5 +93,5 @@ class IncidentInput(BaseModel):
             "classification_error": None,
             "resident_info": None,
             "multiple_incidents_detected": None,
-            "session_history": [],
+            "session_history": load_session(),
         }
