@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from condominium_incident_agent.tools.lookup_resident import lookup_resident
 
-
 _RESIDENTS_FIXTURE = [
     {
         "apartment": "302",

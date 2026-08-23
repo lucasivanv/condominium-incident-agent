@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.nodes.save_occurrence import save_occurrence

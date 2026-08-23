@@ -2,10 +2,10 @@
 
 from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.nodes.generate_response import (
-    generate_response,
-    _format_success,
     _format_error,
     _format_multiple_incidents,
+    _format_success,
+    generate_response,
 )
 
 

@@ -1,15 +1,14 @@
 """Testes unitários para o nó validate_input."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-from datetime import UTC, datetime
 
+import pytest
 from langchain_core.messages import AIMessage
 
 from condominium_incident_agent.nodes.validate_input import (
-    validate_input,
-    _route_after_validate,
     _detect_multiple_incidents,
+    _route_after_validate,
+    validate_input,
 )
 
 

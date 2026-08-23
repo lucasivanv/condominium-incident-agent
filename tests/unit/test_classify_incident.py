@@ -8,9 +8,9 @@ from langchain_core.messages import AIMessage
 
 from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.nodes.classify_incident import (
-    classify_incident,
     _extract_json,
     _route_after_classify,
+    classify_incident,
 )
 
 

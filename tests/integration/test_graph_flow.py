@@ -21,7 +21,6 @@ from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.graph import build_graph
 from condominium_incident_agent.schemas import IncidentInput
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -343,7 +342,7 @@ class TestMultipleIncidentsRejection:
             patch(
                 "condominium_incident_agent.nodes.classify_incident.get_llm",
                 return_value=mock_classify_llm,
-            ) as mock_classify_patch,
+            ),
         ):
             graph.invoke(state, config=config)
 

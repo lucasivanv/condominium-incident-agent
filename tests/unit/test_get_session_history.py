@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from condominium_incident_agent.tools.get_session_history import get_session_history
 
-
 _SESSION_FIXTURE = [
     {
         "occurrence_id": "uuid-1",

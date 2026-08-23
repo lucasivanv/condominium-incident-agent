@@ -1,13 +1,11 @@
 """Testes unitários para o módulo session (load_session / append_to_session)."""
 
 import json
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 import condominium_incident_agent.session as session_module
-from condominium_incident_agent.session import load_session, append_to_session
+from condominium_incident_agent.session import append_to_session, load_session
 
 
 @pytest.fixture()

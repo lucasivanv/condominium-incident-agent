@@ -3,8 +3,8 @@
 from unittest.mock import patch
 
 from condominium_incident_agent.nodes.prepare_context import (
-    prepare_context,
     _build_session_context,
+    prepare_context,
 )
 
 
