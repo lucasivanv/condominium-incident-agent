@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from incident_classification_agent.enums import Category, Severity
-from incident_classification_agent.schemas import IncidentInput
+from condominium_incident_agent.enums import Category, Severity
+from condominium_incident_agent.schemas import IncidentInput
 
 
 class TestIncidentInput:
