@@ -30,6 +30,7 @@ class AgentState(TypedDict):
             sessão corrente. Cada entrada representa uma ocorrência já
             classificada com sucesso, contendo os campos relevantes para
             consulta de reincidência e contexto entre interações.
+        human_approval: Aprovação externa assinada para ações críticas.
     """
 
     user_input: str
@@ -49,3 +50,4 @@ class AgentState(TypedDict):
     resident_info: dict | None
     multiple_incidents_detected: bool | None
     session_history: list[dict]
+    human_approval: dict | None

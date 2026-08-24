@@ -63,6 +63,7 @@ class TestIncidentInput:
             "resident_info",
             "multiple_incidents_detected",
             "session_history",
+            "human_approval",
         }
         assert expected_keys == set(state.keys())
 

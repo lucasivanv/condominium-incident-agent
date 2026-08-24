@@ -8,6 +8,11 @@ from langgraph.prebuilt import ToolNode
 
 from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.llm import get_llm, with_llm_retry
+from condominium_incident_agent.security import (
+    authorize_tool_call,
+    sanitize_untrusted_data,
+    sanitize_untrusted_text,
+)
 from condominium_incident_agent.state import AgentState
 from condominium_incident_agent.tools.get_session_history import get_session_history
 from condominium_incident_agent.tools.lookup_resident import lookup_resident
@@ -103,19 +108,39 @@ def classify_incident(state: AgentState) -> AgentState:
 
             # Tools locais são determinísticas; falha vira erro controlado,
             # sem repetir operações que podem ter efeitos colaterais.
+            for tool_call in ai_message.tool_calls:
+                authorize_tool_call(tool_call["name"], tool_call.get("args", {}))
             tool_results = tool_node.invoke({"messages": messages})
             tool_messages: list[ToolMessage] = tool_results["messages"]
 
             for tm in tool_messages:
-                messages.append(tm)
+                raw_tool_content = tm.content
                 try:
-                    result = json.loads(tm.content) if isinstance(tm.content, str) else tm.content
+                    result = (
+                        json.loads(raw_tool_content)
+                        if isinstance(raw_tool_content, str)
+                        else raw_tool_content
+                    )
                 except (json.JSONDecodeError, TypeError):
-                    result = {}
+                    result = raw_tool_content
+
+                safe_result = sanitize_untrusted_data(result)
+                safe_content = (
+                    json.dumps(safe_result, ensure_ascii=False)
+                    if not isinstance(safe_result, str)
+                    else safe_result
+                )
+                messages.append(
+                    ToolMessage(
+                        content=safe_content,
+                        tool_call_id=tm.tool_call_id,
+                        name=tm.name,
+                    )
+                )
 
                 tool_name = tm.name if hasattr(tm, "name") else ""
                 if tool_name == "lookup_resident":
-                    resident_info = result if result.get("found") else None
+                    resident_info = safe_result if isinstance(safe_result, dict) and safe_result.get("found") else None
         else:
             raise RuntimeError("Limite de chamadas de tools atingido sem resposta final.")
     except Exception as exc:
@@ -130,11 +155,15 @@ def classify_incident(state: AgentState) -> AgentState:
         }
 
     raw = ai_message.content
-    logger.debug("LLM final response: %s", raw)
+    logger.debug(
+        "LLM final response received — occurrence_id: %s, characters: %d",
+        state.get("occurrence_id"),
+        len(raw),
+    )
 
     # Atualiza histórico com a resposta final do LLM
     history = list(history)
-    history.append(raw)
+    history.append(sanitize_untrusted_text(raw))
 
     # Valida e extrai a classificação do JSON retornado pelo LLM
     classification_error: str | None = None

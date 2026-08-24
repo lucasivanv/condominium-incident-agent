@@ -8,6 +8,12 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from condominium_incident_agent.security import (
+    has_valid_human_approval,
+    is_critical_action,
+    sanitize_untrusted_data,
+    sanitize_untrusted_text,
+)
 from condominium_incident_agent.session import append_to_session
 from condominium_incident_agent.state import AgentState
 
@@ -59,6 +65,19 @@ def save_occurrence(state: AgentState) -> AgentState:
         Estado atualizado com ``output_file``, ``escalated_file`` e
         ``session_history`` refletindo o acumulado da sessão corrente.
     """
+    if is_critical_action(state.get("severity")) and not has_valid_human_approval(state):
+        logger.warning(
+            "Critical action blocked without valid human approval for %s",
+            state.get("occurrence_id"),
+        )
+        return {
+            **state,
+            "classification_error": (
+                "Ação crítica bloqueada: aprovação humana válida ausente ou expirada."
+            ),
+            "output_file": None,
+            "escalated_file": None,
+        }
     try:
         return _save_occurrence(state)
     except (OSError, ValueError, TypeError) as exc:
@@ -84,16 +103,16 @@ def _save_occurrence(state: AgentState) -> AgentState:
 
     payload = {
         "occurrence_id": occurrence_id,
-        "reported_by": state.get("reported_by"),
+        "reported_by": sanitize_untrusted_text(state.get("reported_by") or ""),
         "reported_at": state.get("reported_at"),
-        "user_input": state.get("user_input"),
+        "user_input": sanitize_untrusted_text(state.get("user_input") or ""),
         "category": category.value if category is not None else None,
         "severity": severity.value if severity is not None else None,
-        "involved_people": state.get("involved_people") or [],
+        "involved_people": sanitize_untrusted_data(state.get("involved_people") or []),
         "apartment": state.get("apartment"),
         "building": state.get("building"),
-        "summary": state.get("summary"),
-        "resident_info": state.get("resident_info"),
+        "summary": sanitize_untrusted_text(state.get("summary") or ""),
+        "resident_info": sanitize_untrusted_data(state.get("resident_info")),
         "saved_at": datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
@@ -108,7 +127,7 @@ def _save_occurrence(state: AgentState) -> AgentState:
         "reported_by": state.get("reported_by"),
         "category": category.value if category is not None else None,
         "severity": severity.value if severity is not None else None,
-        "summary": state.get("summary"),
+        "summary": sanitize_untrusted_text(state.get("summary") or ""),
         "apartment": state.get("apartment"),
         "building": state.get("building"),
     }

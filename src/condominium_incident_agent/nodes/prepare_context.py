@@ -4,6 +4,7 @@ import logging
 import re
 from pathlib import Path
 
+from condominium_incident_agent.security import sanitize_untrusted_text
 from condominium_incident_agent.session import (
     CONVERSATION_HISTORY_LIMIT,
     RECENT_CONTEXT_LIMIT,
@@ -114,7 +115,7 @@ def _build_session_context(
                     f"  - [{occ.get('reported_at', '?')}] "
                     f"categoria={occ.get('category', '?')} "
                     f"severidade={occ.get('severity', '?')}: "
-                    f"{occ.get('summary', '')}"
+                    f"{sanitize_untrusted_text(occ.get('summary', '') or '')}"
                 )
             lines.append(
                 "Use a tool get_session_history para confirmar ou refinar "
@@ -178,8 +179,8 @@ def prepare_context(state: AgentState) -> AgentState:
         state.get("user_input", ""), state.get("session_history")
     )
 
-    prompt = template.replace("{user_input}", state["user_input"])
-    prompt = prompt.replace("{reported_by}", state["reported_by"])
+    prompt = template.replace("{user_input}", sanitize_untrusted_text(state["user_input"]))
+    prompt = prompt.replace("{reported_by}", sanitize_untrusted_text(state["reported_by"]))
     prompt = prompt.replace("{reported_at}", state["reported_at"])
     prompt = prompt.replace("{session_context}", session_context)
 
