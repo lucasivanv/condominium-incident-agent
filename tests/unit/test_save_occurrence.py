@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.nodes.save_occurrence import save_occurrence
+from condominium_incident_agent.security import create_human_approval
 
 
 def _make_state(**kwargs) -> dict:
@@ -162,7 +163,14 @@ class TestSaveOccurrence:
             MagicMock(),
         )
 
-        state = _make_state(severity=Severity.HIGH, category=Category.SECURITY)
+        monkeypatch.setenv("HUMAN_APPROVAL_SECRET", "unit-test-secret")
+        state = _make_state(
+            severity=Severity.HIGH,
+            category=Category.SECURITY,
+            human_approval=create_human_approval(
+                "test-uuid-001", "admin", "2099-01-01T00:00:00+00:00"
+            ),
+        )
         result = save_occurrence(state)
 
         assert result["escalated_file"] is not None

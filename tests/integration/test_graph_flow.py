@@ -21,6 +21,7 @@ from langchain_core.messages import AIMessage
 from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.graph import build_graph
 from condominium_incident_agent.schemas import IncidentInput
+from condominium_incident_agent.security import create_human_approval
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -88,9 +89,16 @@ def _make_config(reported_by: str = "Porteiro Silva") -> dict:
 def _initial_state(
     user_input: str = "Barulho excessivo no apartamento 302",
     reported_by: str = "Porteiro Silva",
+    occurrence_id: str | None = None,
+    human_approval: dict | None = None,
 ) -> dict:
     incident = IncidentInput(user_input=user_input, reported_by=reported_by)
-    return incident.to_initial_state()
+    state = incident.to_initial_state()
+    if occurrence_id is not None:
+        state["occurrence_id"] = occurrence_id
+    if human_approval is not None:
+        state["human_approval"] = human_approval
+    return state
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +126,7 @@ def patched_env(tmp_path, monkeypatch):
 
     import condominium_incident_agent.session as session_module
     monkeypatch.setattr(session_module, "SESSION_FILE", session_file)
+    monkeypatch.setenv("HUMAN_APPROVAL_SECRET", "integration-test-secret")
 
     with patch(
         "condominium_incident_agent.nodes.prepare_context._load_prompt_template",
@@ -212,11 +221,38 @@ class TestHappyPath:
 # ---------------------------------------------------------------------------
 
 class TestHighSeverityOccurrence:
+    def test_high_severity_without_approval_is_blocked(self, patched_env):
+        """A classificação do LLM não pode autorizar o escalonamento sozinha."""
+        graph = build_graph()
+        state = _initial_state(user_input="Tentativa de invasão no bloco B")
+        config = _make_config()
+
+        with (
+            patch(
+                "condominium_incident_agent.nodes.validate_input.get_llm",
+                return_value=_build_validate_llm_mock("SINGLE"),
+            ),
+            patch(
+                "condominium_incident_agent.nodes.classify_incident.get_llm",
+                return_value=_build_classify_llm_mock(_llm_response("SECURITY", "HIGH")),
+            ),
+        ):
+            result = graph.invoke(state, config=config)
+
+        assert result["output_file"] is None
+        assert result["escalated_file"] is None
+        assert "aprovação humana" in result["classification_error"]
+
     def test_high_severity_creates_escalated_file(self, patched_env):
         """Ocorrência HIGH deve gerar arquivo em reports/escalated/."""
         graph = build_graph()
+        occurrence_id = "high-occurrence-001"
         state = _initial_state(
-            user_input="Invasão armada no lobby do bloco B, apartamento 401"
+            user_input="Invasão armada no lobby do bloco B, apartamento 401",
+            occurrence_id=occurrence_id,
+            human_approval=create_human_approval(
+                occurrence_id, "security-admin", "2099-01-01T00:00:00+00:00"
+            ),
         )
         config = _make_config()
 
@@ -240,8 +276,13 @@ class TestHighSeverityOccurrence:
     def test_high_severity_escalated_file_has_escalated_flag(self, patched_env):
         """O arquivo escalated deve conter o campo escalated=True."""
         graph = build_graph()
+        occurrence_id = "high-occurrence-002"
         state = _initial_state(
-            user_input="Invasão armada no lobby do bloco B"
+            user_input="Invasão armada no lobby do bloco B",
+            occurrence_id=occurrence_id,
+            human_approval=create_human_approval(
+                occurrence_id, "security-admin", "2099-01-01T00:00:00+00:00"
+            ),
         )
         config = _make_config()
 
@@ -266,7 +307,14 @@ class TestHighSeverityOccurrence:
     def test_high_severity_also_saves_main_report(self, patched_env):
         """Além do escalated, o relatório principal também deve ser salvo."""
         graph = build_graph()
-        state = _initial_state(user_input="Incidente crítico de segurança")
+        occurrence_id = "high-occurrence-003"
+        state = _initial_state(
+            user_input="Incidente crítico de segurança",
+            occurrence_id=occurrence_id,
+            human_approval=create_human_approval(
+                occurrence_id, "security-admin", "2099-01-01T00:00:00+00:00"
+            ),
+        )
         config = _make_config()
 
         with (

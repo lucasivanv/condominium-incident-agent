@@ -380,3 +380,5 @@ Não há evidência concreta de falsa confiança no escopo revisado. O comportam
 ## Análise crítica
 
 A terceira tentativa apresentou um resultado mais objetivo, sem apontar problemas ou sugerir alterações sem evidências concretas. Entretanto, é difícil obter resultados realmente assertivos em code review utilizando modelos gratuitos, principalmente devido às limitações de capacidade e contexto. Dessa forma, embora o resultado demonstre o uso da IA no processo, seus apontamentos devem ser considerados com cautela e não podem ser tomados como uma validação definitiva da qualidade do código.
+
+Outras utilizações de code review assistido por IA podem ser consultadas nos pull requests do repositório.

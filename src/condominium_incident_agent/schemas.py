@@ -94,4 +94,5 @@ class IncidentInput(BaseModel):
             "resident_info": None,
             "multiple_incidents_detected": None,
             "session_history": load_session(),
+            "human_approval": None,
         }

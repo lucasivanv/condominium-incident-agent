@@ -2,6 +2,7 @@
 
 import logging
 
+from condominium_incident_agent.enums import Severity
 from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -70,15 +71,20 @@ def _format_error(state: AgentState) -> str:
         Mensagem de erro formatada como string.
     """
     lines = [
-        "❌ Não foi possível classificar o incidente.",
+        "❌ A ocorrência não foi registrada.",
         "",
         f"🆔 ID: {state.get('occurrence_id', 'N/A')}",
         f"📋 Relato recebido: {state.get('user_input', '')}",
         "",
         f"⚠️  Motivo: {state.get('classification_error', 'Erro desconhecido')}",
         "",
-        "Por favor, verifique o relato e tente novamente.",
+        "Por favor, verifique o motivo e tente novamente.",
     ]
+    if state.get("severity") == Severity.HIGH and state.get("classification_error", "").startswith(
+        "Ação crítica bloqueada"
+    ):
+        lines[0] = "🛑 Ocorrência classificada, mas bloqueada por segurança."
+        lines[-1] = "Forneça uma aprovação humana externa válida para prosseguir."
     return "\n".join(lines)
 
 
