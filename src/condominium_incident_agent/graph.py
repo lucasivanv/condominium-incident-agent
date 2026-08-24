@@ -11,7 +11,11 @@ from condominium_incident_agent.nodes.classify_incident import (
 )
 from condominium_incident_agent.nodes.generate_response import generate_response
 from condominium_incident_agent.nodes.handle_error import handle_error
-from condominium_incident_agent.nodes.prepare_context import prepare_context
+from condominium_incident_agent.nodes.prepare_context import (
+    prepare_context,
+    retrieve_conversation_context,
+    retrieve_session_context,
+)
 from condominium_incident_agent.nodes.save_occurrence import save_occurrence
 from condominium_incident_agent.nodes.validate_input import (
     _route_after_validate,
@@ -21,6 +25,14 @@ from condominium_incident_agent.observability import instrument_node
 from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
+
+
+def _route_after_validate_fanout(state: AgentState) -> str | list[str]:
+    """Expande o caminho normal para as duas recuperações independentes."""
+    route = _route_after_validate(state)
+    if route == "prepare_context":
+        return ["retrieve_session_context", "retrieve_conversation_context"]
+    return route
 
 
 def build_graph() -> StateGraph:
@@ -36,7 +48,8 @@ def build_graph() -> StateGraph:
     pelo nó save_occurrence) serve como fonte de verdade durável.
 
     Fluxo principal:
-        START → validate_input → prepare_context → classify_incident
+         START → validate_input → [retrieve_session_context,
+             retrieve_conversation_context] → prepare_context → classify_incident
                → (condicional) → save_occurrence → generate_response → END
 
     Fluxo de múltiplos incidentes (rejeição antecipada):
@@ -51,6 +64,14 @@ def build_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
     graph.add_node("validate_input", instrument_node("validate_input", validate_input))
+    graph.add_node(
+        "retrieve_session_context",
+        instrument_node("retrieve_session_context", retrieve_session_context),
+    )
+    graph.add_node(
+        "retrieve_conversation_context",
+        instrument_node("retrieve_conversation_context", retrieve_conversation_context),
+    )
     graph.add_node("prepare_context", instrument_node("prepare_context", prepare_context))
     graph.add_node("classify_incident", instrument_node("classify_incident", classify_incident))
     graph.add_node("handle_error", instrument_node("handle_error", handle_error))
@@ -61,13 +82,16 @@ def build_graph() -> StateGraph:
 
     graph.add_conditional_edges(
         "validate_input",
-        _route_after_validate,
+        _route_after_validate_fanout,
         {
-            "prepare_context": "prepare_context",
+            "retrieve_session_context": "retrieve_session_context",
+            "retrieve_conversation_context": "retrieve_conversation_context",
             "generate_response": "generate_response",
         },
     )
 
+    graph.add_edge("retrieve_session_context", "prepare_context")
+    graph.add_edge("retrieve_conversation_context", "prepare_context")
     graph.add_edge("prepare_context", "classify_incident")
 
     graph.add_conditional_edges(

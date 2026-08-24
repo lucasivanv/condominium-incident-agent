@@ -156,6 +156,24 @@ def _cap_conversation_history(history: list[str]) -> list[str]:
     return truncated
 
 
+def retrieve_session_context(state: AgentState) -> dict[str, str]:
+    """Recupera o contexto de ocorrências sem depender do histórico conversacional."""
+    return {
+        "session_context": _build_session_context(
+            state.get("user_input", ""), state.get("session_history")
+        )
+    }
+
+
+def retrieve_conversation_context(state: AgentState) -> dict[str, list[str]]:
+    """Limita o histórico conversacional para uso pelo prompt do classificador."""
+    return {
+        "conversation_context": _cap_conversation_history(
+            list(state.get("conversation_history") or [])
+        )
+    }
+
+
 def prepare_context(state: AgentState) -> AgentState:
     """Monta a mensagem de entrada para o LLM e atualiza o histórico.
 
@@ -175,7 +193,7 @@ def prepare_context(state: AgentState) -> AgentState:
     """
     template = _load_prompt_template()
 
-    session_context = _build_session_context(
+    session_context = state.get("session_context") or _build_session_context(
         state.get("user_input", ""), state.get("session_history")
     )
 
@@ -184,7 +202,10 @@ def prepare_context(state: AgentState) -> AgentState:
     prompt = prompt.replace("{reported_at}", state["reported_at"])
     prompt = prompt.replace("{session_context}", session_context)
 
-    history = _cap_conversation_history(list(state.get("conversation_history") or []))
+    history = list(
+        state.get("conversation_context")
+        or _cap_conversation_history(list(state.get("conversation_history") or []))
+    )
     history.append(prompt)
 
     logger.info("Context prepared for occurrence_id: %s", state.get("occurrence_id"))

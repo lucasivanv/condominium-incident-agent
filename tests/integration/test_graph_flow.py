@@ -250,6 +250,8 @@ class TestObservabilityEvidence:
         assert result["correlation_id"] == correlation_id
         assert completed_nodes == {
             "validate_input",
+            "retrieve_session_context",
+            "retrieve_conversation_context",
             "prepare_context",
             "classify_incident",
             "save_occurrence",
@@ -265,6 +267,19 @@ class TestObservabilityEvidence:
             for record in investigation["logs"]
             if record["event"] == "completed"
         )
+
+
+class TestGraphTopology:
+    def test_context_retrieval_uses_fan_out_and_fan_in(self):
+        """As recuperações independentes convergem antes da classificação."""
+        graph = build_graph()
+        edges = {(edge.source, edge.target) for edge in graph.get_graph().edges}
+
+        assert ("validate_input", "retrieve_session_context") in edges
+        assert ("validate_input", "retrieve_conversation_context") in edges
+        assert ("retrieve_session_context", "prepare_context") in edges
+        assert ("retrieve_conversation_context", "prepare_context") in edges
+        assert ("prepare_context", "classify_incident") in edges
 
 
 # ---------------------------------------------------------------------------
