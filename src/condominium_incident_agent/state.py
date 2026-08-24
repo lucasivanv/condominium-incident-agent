@@ -51,3 +51,4 @@ class AgentState(TypedDict):
     multiple_incidents_detected: bool | None
     session_history: list[dict]
     human_approval: dict | None
+    correlation_id: str

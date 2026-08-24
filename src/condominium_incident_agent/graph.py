@@ -17,6 +17,7 @@ from condominium_incident_agent.nodes.validate_input import (
     _route_after_validate,
     validate_input,
 )
+from condominium_incident_agent.observability import instrument_node
 from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -49,12 +50,12 @@ def build_graph() -> StateGraph:
     """
     graph = StateGraph(AgentState)
 
-    graph.add_node("validate_input", validate_input)
-    graph.add_node("prepare_context", prepare_context)
-    graph.add_node("classify_incident", classify_incident)
-    graph.add_node("handle_error", handle_error)
-    graph.add_node("save_occurrence", save_occurrence)
-    graph.add_node("generate_response", generate_response)
+    graph.add_node("validate_input", instrument_node("validate_input", validate_input))
+    graph.add_node("prepare_context", instrument_node("prepare_context", prepare_context))
+    graph.add_node("classify_incident", instrument_node("classify_incident", classify_incident))
+    graph.add_node("handle_error", instrument_node("handle_error", handle_error))
+    graph.add_node("save_occurrence", instrument_node("save_occurrence", save_occurrence))
+    graph.add_node("generate_response", instrument_node("generate_response", generate_response))
 
     graph.add_edge(START, "validate_input")
 

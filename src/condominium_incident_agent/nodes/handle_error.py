@@ -23,8 +23,8 @@ def handle_error(state: AgentState) -> AgentState:
     """
     error = state.get("classification_error", "Erro desconhecido na classificação.")
     logger.error(
-        "Handling classification error for occurrence_id %s: %s",
+        "Handling classification error for occurrence_id %s (error_present: %s)",
         state.get("occurrence_id"),
-        error,
+        bool(error),
     )
     return state

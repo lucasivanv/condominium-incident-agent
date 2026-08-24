@@ -46,7 +46,7 @@ def _extract_json(text: str) -> dict:
                 return obj
             except json.JSONDecodeError:
                 continue
-    raise ValueError(f"Nenhum JSON válido encontrado na resposta do LLM: {text!r}")
+    raise ValueError("Nenhum JSON válido encontrado na resposta do LLM.")
 
 
 def _route_after_classify(state: AgentState) -> str:
@@ -198,7 +198,7 @@ def classify_incident(state: AgentState) -> AgentState:
 
     except (ValueError, KeyError) as exc:
         classification_error = str(exc)
-        logger.error("Classification failed — %s", classification_error)
+        logger.error("Classification failed — error_type: %s", type(exc).__name__)
 
     if not classification_error:
         logger.info(

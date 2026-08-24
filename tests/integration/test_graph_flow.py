@@ -20,6 +20,10 @@ from langchain_core.messages import AIMessage
 
 from condominium_incident_agent.enums import Category, Severity
 from condominium_incident_agent.graph import build_graph
+from condominium_incident_agent.observability import (
+    clear_observability,
+    investigate_execution,
+)
 from condominium_incident_agent.schemas import IncidentInput
 from condominium_incident_agent.security import create_human_approval
 
@@ -214,6 +218,53 @@ class TestHappyPath:
 
         assert result["occurrence_id"] is not None
         assert len(result["occurrence_id"]) == 36
+
+
+class TestObservabilityEvidence:
+    def test_full_execution_can_be_investigated_by_correlation_id(self, patched_env):
+        """Uma execução real do grafo deve aparecer nos dois sinais correlacionados."""
+        clear_observability()
+        graph = build_graph()
+        state = _initial_state()
+        correlation_id = state["correlation_id"]
+
+        with (
+            patch(
+                "condominium_incident_agent.nodes.validate_input.get_llm",
+                return_value=_build_validate_llm_mock("SINGLE"),
+            ),
+            patch(
+                "condominium_incident_agent.nodes.classify_incident.get_llm",
+                return_value=_build_classify_llm_mock(_llm_response("NOISE", "LOW")),
+            ),
+        ):
+            result = graph.invoke(state, config=_make_config("Observability"))
+
+        investigation = investigate_execution(correlation_id)
+        completed_nodes = {
+            record["node"]
+            for record in investigation["logs"]
+            if record["event"] == "completed"
+        }
+
+        assert result["correlation_id"] == correlation_id
+        assert completed_nodes == {
+            "validate_input",
+            "prepare_context",
+            "classify_incident",
+            "save_occurrence",
+            "generate_response",
+        }
+        assert investigation["audit"]
+        assert all(
+            record["correlation_id"] == correlation_id
+            for record in investigation["logs"] + investigation["audit"]
+        )
+        assert all(
+            "duration_ms" in record
+            for record in investigation["logs"]
+            if record["event"] == "completed"
+        )
 
 
 # ---------------------------------------------------------------------------
