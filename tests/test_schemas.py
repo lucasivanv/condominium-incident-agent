@@ -46,6 +46,7 @@ class TestIncidentInput:
         obj = IncidentInput(user_input="Teste", reported_by="Porteiro")
         state = obj.to_initial_state()
         expected_keys = {
+            "correlation_id",
             "user_input",
             "reported_by",
             "reported_at",
@@ -74,6 +75,7 @@ class TestIncidentInput:
         ):
             state = obj.to_initial_state()
         assert state["user_input"] == "Teste"
+        assert len(state["correlation_id"]) == 36
         assert state["reported_by"] == "Porteiro"
         assert state["occurrence_id"] is None
         assert state["category"] is None

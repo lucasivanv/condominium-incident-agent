@@ -46,8 +46,8 @@ def _detect_multiple_incidents(user_input: str) -> bool:
         return "MULTIPLE" in answer
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "Multiple incidents detection failed (%s). Assuming single incident.",
-            exc,
+            "Multiple incidents detection failed (error_type: %s). Assuming single incident.",
+            type(exc).__name__,
         )
         return False
 

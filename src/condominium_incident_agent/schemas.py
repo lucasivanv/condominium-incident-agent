@@ -5,6 +5,7 @@ fornecer, quais são obrigatórios, quais têm defaults e quais as regras
 de validação aplicadas antes do processamento.
 """
 
+import uuid
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
@@ -77,6 +78,7 @@ class IncidentInput(BaseModel):
             Dicionário compatível com AgentState pronto para invocar o grafo.
         """
         return {
+            "correlation_id": str(uuid.uuid4()),
             "user_input": self.user_input.strip(),
             "reported_by": self.reported_by.strip(),
             "reported_at": self.reported_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
