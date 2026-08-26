@@ -97,4 +97,10 @@ class IncidentInput(BaseModel):
             "multiple_incidents_detected": None,
             "session_history": load_session(),
             "human_approval": None,
+            "flowise_delivery_status": None,
+            "flowise_delivery_error": None,
+            "flowise_status": None,
+            "flowise_action": None,
+            "flowise_processed_at": None,
+            "flowise_triage": None,
         }

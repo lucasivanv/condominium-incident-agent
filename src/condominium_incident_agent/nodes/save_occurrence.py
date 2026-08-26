@@ -91,6 +91,27 @@ def save_occurrence(state: AgentState) -> AgentState:
         }
 
 
+def update_occurrence_flowise_result(state: AgentState) -> None:
+    """Atualiza o relatório salvo com o resultado da automação externa."""
+    output_file = state.get("output_file")
+    if not output_file:
+        return
+    path = Path(output_file)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "flowise_status": state.get("flowise_status"),
+            "flowise_action": state.get("flowise_action"),
+            "flowise_correlation_id": state.get("correlation_id"),
+            "flowise_processed_at": state.get("flowise_processed_at"),
+            "flowise_delivery_status": state.get("flowise_delivery_status"),
+            "flowise_error": state.get("flowise_delivery_error"),
+            "flowise_triage": state.get("flowise_triage"),
+        }
+    )
+    _write_json_atomic(path, payload)
+
+
 def _save_occurrence(state: AgentState) -> AgentState:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 

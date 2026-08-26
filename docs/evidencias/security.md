@@ -1,6 +1,6 @@
 # Segurança, Governança e Limites de Autonomia
 
-**Data da evidência:** 2026-08-23  
+**Data da evidência:** 2026-08-23
 **Escopo:** entradas não confiáveis, prompt injection, tools, dados sensíveis e aprovação humana.
 
 ## Objetivo
@@ -59,11 +59,13 @@ prompt, do relato ou da resposta do LLM.
 
 Sem aprovação, com token adulterado, ocorrência divergente ou aprovação expirada,
 a ação é bloqueada, `classification_error` é preenchido e nenhum relatório é
-criado. `LOW` e `MEDIUM` continuam seguindo o fluxo automático existente.
+criado. `LOW` e `MEDIUM` continuam seguindo o fluxo automático existente. O
+envio ao Flowise ocorre somente depois dessa validação e da persistência
+autorizada.
 
 O CLI atual demonstra o bloqueio de ocorrências `HIGH` sem implementar uma tela
-ou arquivo de aprovação. O Flowise poderá futuramente funcionar como interface
-visual para a decisão humana, mas a aplicação continuará validando identidade,
+ou arquivo de aprovação. O Flowise pode funcionar como interface visual
+externa para a decisão humana, mas a aplicação continua validando identidade,
 permissões, validade, vínculo ao `occurrence_id` e assinatura antes de salvar.
 
 ## Proteção de credenciais e informações sensíveis
@@ -138,4 +140,4 @@ Resultado mais recente: suíte completa com 197 testes aprovados e Ruff aprovado
 - O CLI não possui uma interface real de aprovação humana; o bloqueio sem aprovação é demonstrado nos testes e na execução local.
 - A sanitização cobre padrões comuns de credenciais, não todos os formatos possíveis de informação sensível.
 - A proteção contra prompt injection usa instruções no prompt, tratamento dos dados como não confiáveis e validação determinística; não é um detector universal.
-- A integração com Flowise ainda é uma evolução futura.
+- A execução e a configuração do workflow no Flowise permanecem externas à aplicação.

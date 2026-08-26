@@ -17,6 +17,7 @@ from condominium_incident_agent.nodes.prepare_context import (
     retrieve_session_context,
 )
 from condominium_incident_agent.nodes.save_occurrence import save_occurrence
+from condominium_incident_agent.nodes.send_to_flowise import send_to_flowise
 from condominium_incident_agent.nodes.validate_input import (
     _route_after_validate,
     validate_input,
@@ -76,6 +77,7 @@ def build_graph() -> StateGraph:
     graph.add_node("classify_incident", instrument_node("classify_incident", classify_incident))
     graph.add_node("handle_error", instrument_node("handle_error", handle_error))
     graph.add_node("save_occurrence", instrument_node("save_occurrence", save_occurrence))
+    graph.add_node("send_to_flowise", instrument_node("send_to_flowise", send_to_flowise))
     graph.add_node("generate_response", instrument_node("generate_response", generate_response))
 
     graph.add_edge(START, "validate_input")
@@ -104,7 +106,8 @@ def build_graph() -> StateGraph:
     )
 
     graph.add_edge("handle_error", "generate_response")
-    graph.add_edge("save_occurrence", "generate_response")
+    graph.add_edge("save_occurrence", "send_to_flowise")
+    graph.add_edge("send_to_flowise", "generate_response")
     graph.add_edge("generate_response", END)
 
     checkpointer = MemorySaver()

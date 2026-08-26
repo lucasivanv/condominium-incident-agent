@@ -65,6 +65,12 @@ class TestIncidentInput:
             "multiple_incidents_detected",
             "session_history",
             "human_approval",
+            "flowise_delivery_status",
+            "flowise_delivery_error",
+            "flowise_status",
+            "flowise_action",
+            "flowise_processed_at",
+            "flowise_triage",
         }
         assert expected_keys == set(state.keys())
 
