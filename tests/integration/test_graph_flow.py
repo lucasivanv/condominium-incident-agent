@@ -255,6 +255,7 @@ class TestObservabilityEvidence:
             "prepare_context",
             "classify_incident",
             "save_occurrence",
+            "send_to_flowise",
             "generate_response",
         }
         assert investigation["audit"]

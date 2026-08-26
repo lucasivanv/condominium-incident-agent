@@ -33,6 +33,12 @@ class AgentState(TypedDict):
         session_context: Contexto textual recuperado do histórico persistido.
         conversation_context: Histórico conversacional limitado para o prompt.
         human_approval: Aprovação externa assinada para ações críticas.
+        flowise_delivery_status: Resultado do encaminhamento HTTP externo.
+        flowise_delivery_error: Erro sanitizado do encaminhamento, se houver.
+        flowise_status: Status retornado pelo workflow externo.
+        flowise_action: Ação operacional retornada pelo workflow externo.
+        flowise_processed_at: Momento informado pelo workflow externo.
+        flowise_triage: Relatório operacional produzido pela automação low-code.
     """
 
     user_input: str
@@ -56,3 +62,9 @@ class AgentState(TypedDict):
     conversation_context: list[str] | None
     human_approval: dict | None
     correlation_id: str
+    flowise_delivery_status: str | None
+    flowise_delivery_error: str | None
+    flowise_status: str | None
+    flowise_action: str | None
+    flowise_processed_at: str | None
+    flowise_triage: dict | None

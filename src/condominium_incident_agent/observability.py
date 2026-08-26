@@ -29,6 +29,9 @@ def _safe_result(state: AgentState | None) -> dict[str, Any]:
         "classification_error": bool(state.get("classification_error")),
         "output_file": state.get("output_file"),
         "escalated": bool(state.get("escalated_file")),
+        "flowise_delivery_status": state.get("flowise_delivery_status"),
+        "flowise_status": state.get("flowise_status"),
+        "flowise_action": state.get("flowise_action"),
     }
 
 

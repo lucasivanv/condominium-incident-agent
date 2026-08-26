@@ -58,6 +58,20 @@ def _format_success(state: AgentState) -> str:
     if state.get("escalated_file"):
         lines.append(f"🚨 ESCALONADO (HIGH): {state['escalated_file']}")
 
+    if state.get("flowise_delivery_status"):
+        lines.append(f"🔗 Flowise: {state['flowise_delivery_status']}")
+    if state.get("flowise_action"):
+        lines.append(f"🎯 Ação operacional: {state['flowise_action']}")
+    triage = state.get("flowise_triage") or {}
+    if triage.get("responsible_team"):
+        lines.append(f"👷 Equipe responsável: {triage['responsible_team']}")
+    if triage.get("priority"):
+        lines.append(f"📌 Prioridade operacional: {triage['priority']}")
+    if triage.get("sla_minutes") is not None:
+        lines.append(f"⏱️ Prazo de atendimento: {triage['sla_minutes']} min")
+    if triage.get("diagnostic_summary"):
+        lines.append(f"📊 Diagnóstico Flowise: {triage['diagnostic_summary']}")
+
     return "\n".join(lines)
 
 
