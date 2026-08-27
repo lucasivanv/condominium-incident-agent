@@ -49,6 +49,7 @@ Usam `unittest.mock.patch` para substituir:
 | `test_session.py`             | Módulo `session`           | Leitura e escrita do session.json, resiliência a falhas                                 |
 | `test_lookup_resident.py`     | Tool `lookup_resident`     | Busca case-insensitive, filtro por bloco, retorno de dados completos                    |
 | `test_get_session_history.py` | Tool `get_session_history` | Filtragem por apartamento/bloco, contagem, campos do retorno                            |
+| `test_ci_analysis.py`         | Análise do pipeline        | JUnit, anomalias, regressão de duração e níveis de risco                                |
 
 ### Testes de Integração
 
@@ -66,8 +67,9 @@ Localizados em `tests/integration/test_graph_flow.py`, executam o grafo LangGrap
 
 ### Ocorrência Crítica (HIGH)
 
-- Arquivo criado em `reports/escalated/` com flag `escalated: true`
-- Relatório principal também salvo normalmente
+- Sem aprovação humana válida, nenhum relatório ou escalonamento é criado
+- Com aprovação HMAC válida e vigente, o arquivo escalonado contém `escalated: true`
+- O relatório principal também é salvo após a autorização
 
 ### Entrada Inválida — Múltiplos Incidentes
 
@@ -92,6 +94,21 @@ Localizados em `tests/integration/test_graph_flow.py`, executam o grafo LangGrap
 - `session.json` gravado após ocorrência bem-sucedida
 - `session.json` não modificado após falha de classificação
 - Arquivo de relatório contém `reported_by` e `reported_at`
+
+---
+
+## Priorização por Risco
+
+O cenário prioritário é o bloqueio de uma ocorrência `HIGH` sem aprovação
+humana válida. Ele possui probabilidade média e impacto crítico: uma regressão
+permitiria persistir e escalonar uma ação crítica sem autorização. O teste
+`test_high_severity_without_approval_is_blocked`, em
+`tests/integration/test_graph_flow.py`, recebe prioridade P0.
+
+Também são prioritários o cenário adversarial de prompt injection (P0), a
+indisponibilidade do Flowise (P1), falhas do LLM (P1) e falhas de persistência
+(P1). A matriz e a justificativa completas estão em
+`docs/evidencias/devops-qa.md`.
 
 ---
 
