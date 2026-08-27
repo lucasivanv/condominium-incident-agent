@@ -1,7 +1,6 @@
 # Estratégia de Testes — condominium-incident-agent
 
-**Data da auditoria:** 2026-08-22
-**Ambiente:** Windows 11, Python 3.12.13, uv, pytest 9.1.1
+**Data da auditoria:** 2026-08-22 **Ambiente:** Windows 11, Python 3.12.13, uv, pytest 9.1.1
 
 ## Visão Geral
 
@@ -18,6 +17,10 @@ tests/
 │   ├── test_save_occurrence.py
 │   ├── test_handle_error.py
 │   ├── test_session.py
+│   ├── test_security.py
+│   ├── test_observability.py
+│   ├── test_flowise_webhook.py
+│   ├── test_ci_analysis.py
 │   ├── test_lookup_resident.py
 │   └── test_get_session_history.py
 └── integration/
@@ -30,8 +33,7 @@ tests/
 
 ### Testes Unitários
 
-Testam cada componente de forma isolada, sem dependências externas reais.
-Usam `unittest.mock.patch` para substituir:
+Testam cada componente de forma isolada, sem dependências externas reais. Usam `unittest.mock.patch` para substituir:
 
 - **LLM (Ollama)** — mockado nos pontos de injeção `get_llm()` de cada nó
 - **Filesystem** — redirecionado para `tmp_path` do pytest via `monkeypatch.setattr`
@@ -41,7 +43,7 @@ Usam `unittest.mock.patch` para substituir:
 | Arquivo                       | Componente                 | Foco                                                                                    |
 | ----------------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
 | `test_validate_input.py`      | Nó `validate_input`        | Validação de campos, geração de UUID, detecção de múltiplos incidentes, fallback de LLM |
-| `test_prepare_context.py`     | Nó `prepare_context`       | Substituição de variáveis no template, construção do contexto de sessão                 |
+| `test_prepare_context.py`     | Nó `prepare_context`       | Separação System/Human, sanitização e contexto de sessão                                |
 | `test_classify_incident.py`   | Nó `classify_incident`     | Parse de JSON, validação de enums, loop agentic, roteamento pós-classificação           |
 | `test_generate_response.py`   | Nó `generate_response`     | Formatação de mensagens de sucesso, erro e múltiplos incidentes                         |
 | `test_save_occurrence.py`     | Nó `save_occurrence`       | Criação de arquivos, lógica de escalamento HIGH, atualização do session_history         |
@@ -50,6 +52,9 @@ Usam `unittest.mock.patch` para substituir:
 | `test_lookup_resident.py`     | Tool `lookup_resident`     | Busca case-insensitive, filtro por bloco, retorno de dados completos                    |
 | `test_get_session_history.py` | Tool `get_session_history` | Filtragem por apartamento/bloco, contagem, campos do retorno                            |
 | `test_ci_analysis.py`         | Análise do pipeline        | JUnit, anomalias, regressão de duração e níveis de risco                                |
+| `test_security.py`            | Segurança determinística  | Aprovação HMAC, allowlist, argumentos e sanitização                                     |
+| `test_observability.py`       | Observabilidade           | Logs, auditoria, correlação, duração e proteção de dados                                |
+| `test_flowise_webhook.py`     | Integração low-code       | POST, schemas, correlação, timeout, falhas e export do workflow                         |
 
 ### Testes de Integração
 
@@ -99,16 +104,9 @@ Localizados em `tests/integration/test_graph_flow.py`, executam o grafo LangGrap
 
 ## Priorização por Risco
 
-O cenário prioritário é o bloqueio de uma ocorrência `HIGH` sem aprovação
-humana válida. Ele possui probabilidade média e impacto crítico: uma regressão
-permitiria persistir e escalonar uma ação crítica sem autorização. O teste
-`test_high_severity_without_approval_is_blocked`, em
-`tests/integration/test_graph_flow.py`, recebe prioridade P0.
+O cenário prioritário é o bloqueio de uma ocorrência `HIGH` sem aprovação humana válida. Ele possui probabilidade média e impacto crítico: uma regressão permitiria persistir e escalonar uma ação crítica sem autorização. O teste `test_high_severity_without_approval_is_blocked`, em `tests/integration/test_graph_flow.py`, recebe prioridade P0.
 
-Também são prioritários o cenário adversarial de prompt injection (P0), a
-indisponibilidade do Flowise (P1), falhas do LLM (P1) e falhas de persistência
-(P1). A matriz e a justificativa completas estão em
-`docs/evidencias/devops-qa.md`.
+Também são prioritários o cenário adversarial de prompt injection (P0), a indisponibilidade do Flowise (P1), falhas do LLM (P1) e falhas de persistência (P1). A matriz e a justificativa completas estão em `docs/evidencias/devops-qa.md`.
 
 ---
 

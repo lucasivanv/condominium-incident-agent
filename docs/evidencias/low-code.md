@@ -1,25 +1,16 @@
 # Automação Low-Code com Flowise
 
-**Data da evidência:** 2026-08-26  
-**Ambiente:** Windows 11, Python 3.12.13, Flowise 3.1.3, AgentFlow V2  
-**Escopo:** webhook HTTP, triagem operacional, integração com LangGraph,
-rastreabilidade, resiliência e saída observável.
+**Data da evidência:** 2026-08-26 **Ambiente:** Windows 11, Python 3.12.13, Flowise 3.1.3, AgentFlow V2 **Escopo:** webhook HTTP, triagem operacional, integração com LangGraph, rastreabilidade, resiliência e saída observável.
 
 ## Objetivo
 
-Demonstrar o uso efetivo de uma automação low-code durante o processamento real
-de ocorrências condominiais. O Flowise recebe uma ocorrência já classificada,
-autorizada e persistida pelo LangGraph, executa uma triagem operacional e
-devolve um resultado que influencia a resposta da aplicação.
+Demonstrar o uso efetivo de uma automação low-code durante o processamento real de ocorrências condominiais. O Flowise recebe uma ocorrência já classificada, autorizada e persistida pelo LangGraph, executa uma triagem operacional e devolve um resultado que influencia a resposta da aplicação.
 
-A integração preserva a arquitetura existente: classificação, autorização,
-aprovação humana e persistência continuam sob controle determinístico da
-aplicação principal.
+A integração preserva a arquitetura existente: classificação, autorização, aprovação humana e persistência continuam sob controle determinístico da aplicação principal.
 
 ## Arquitetura da integração
 
-O node `send_to_flowise` é executado entre `save_occurrence` e
-`generate_response`:
+O node `send_to_flowise` é executado entre `save_occurrence` e `generate_response`:
 
 ```text
 LangGraph
@@ -33,8 +24,7 @@ LangGraph
   -> persistência e exibição do resultado
 ```
 
-O workflow importável está em `flowise/workflow.json` e utiliza nodes nativos
-do AgentFlow V2 compatíveis com o Flowise 3.1.3:
+O workflow importável está em `flowise/workflow.json` e utiliza nodes nativos do AgentFlow V2 compatíveis com o Flowise 3.1.3:
 
 | Etapa | Responsabilidade |
 | --- | --- |
@@ -46,14 +36,9 @@ do AgentFlow V2 compatíveis com o Flowise 3.1.3:
 
 ## Contrato e rastreabilidade
 
-A tool HTTP valida o payload com Pydantic antes de acessar a rede. O envio
-contém apenas os identificadores, classificação, resumo sanitizado, pessoas
-envolvidas e localização conhecida. Relato bruto, aprovação humana, cadastro
-de morador e credenciais não são encaminhados.
+A tool HTTP valida o payload com Pydantic antes de acessar a rede. O envio contém apenas os identificadores, classificação, resumo sanitizado, pessoas envolvidas e localização conhecida. Relato bruto, aprovação humana, cadastro de morador e credenciais não são encaminhados.
 
-O `correlation_id` é obrigatório e preservado no request, processamento,
-resposta, logs e relatório. A aplicação rejeita respostas com correlação ou
-`occurrence_id` divergentes. O Flowise gera ainda:
+O `correlation_id` é obrigatório e preservado no request, processamento, resposta, logs e relatório. A aplicação rejeita respostas com correlação ou `occurrence_id` divergentes. O Flowise gera ainda:
 
 ```text
 audit_record_id = flowise-<correlation_id>
@@ -61,8 +46,7 @@ audit_record_id = flowise-<correlation_id>
 
 ## Processamento e saída observável
 
-A severidade define ação, prioridade, SLA e alerta; a categoria seleciona a
-equipe responsável. O Flowise produz:
+A severidade define ação, prioridade, SLA e alerta; a categoria seleciona a equipe responsável. O Flowise produz:
 
 - `action`;
 - `priority`;
@@ -72,16 +56,14 @@ equipe responsável. O Flowise produz:
 - `diagnostic_summary`;
 - `audit_record_id` e `processed_at`.
 
-O resultado é observável em dois pontos que podem ser reproduzidos sem depender
-de artefatos ignorados pelo Git:
+O resultado é observável em dois pontos que podem ser reproduzidos sem depender de artefatos ignorados pelo Git:
 
 1. resposta HTTP e histórico de execução do Flowise;
 2. resposta apresentada no terminal, com ação, equipe, prioridade, SLA e diagnóstico.
 
 ## Resiliência
 
-Falhas do serviço externo não desfazem uma ocorrência já persistida. A
-integração utiliza timeout configurável e resultados controlados:
+Falhas do serviço externo não desfazem uma ocorrência já persistida. A integração utiliza timeout configurável e resultados controlados:
 
 | Estado | Significado |
 | --- | --- |
@@ -90,8 +72,7 @@ integração utiliza timeout configurável e resultados controlados:
 | `BLOCKED` | Payload ou configuração inválida antes do envio |
 | `NOT_CONFIGURED` | `FLOWISE_WEBHOOK_URL` não foi configurada |
 
-Logs de sucesso e falha incluem o `correlation_id`, sem registrar payload bruto,
-credenciais ou conteúdo integral de exceções.
+Logs de sucesso e falha incluem o `correlation_id`, sem registrar payload bruto, credenciais ou conteúdo integral de exceções.
 
 ## Critérios atendidos
 
@@ -115,22 +96,17 @@ flowise_delivery_status = SENT
 flowise_status = PROCESSED
 ```
 
-A triagem retornou ação `MONITOR`, equipe `MANUTENCAO`, prioridade `NORMAL`,
-SLA de 1440 minutos, alerta desativado e o registro:
+A triagem retornou ação `MONITOR`, equipe `MANUTENCAO`, prioridade `NORMAL`, SLA de 1440 minutos, alerta desativado e o registro:
 
 ```text
 flowise-6880e3ba-f23c-462f-9ee7-7ecf3c23a924
 ```
 
-O resultado foi apresentado no terminal. O mesmo `correlation_id` permite
-localizar a execução correspondente no histórico do Flowise e relacioná-la aos
-logs estruturados da aplicação.
+O resultado foi apresentado no terminal. O mesmo `correlation_id` permite localizar a execução correspondente no histórico do Flowise e relacioná-la aos logs estruturados da aplicação.
 
 ## Testes e reprodução
 
-Os testes da integração cobrem POST, payload válido e inválido, correlação
-obrigatória e divergente, timeout, erro HTTP, indisponibilidade, rejeição do
-workflow, persistência do resultado e estrutura do export.
+Os testes da integração cobrem POST, payload válido e inválido, correlação obrigatória e divergente, timeout, erro HTTP, indisponibilidade, rejeição do workflow, persistência do resultado e estrutura do export.
 
 Comandos de reprodução:
 
@@ -148,8 +124,7 @@ uv run pytest -q
 uv run ruff check src tests
 ```
 
-Para a execução real, inicie o Flowise, importe `flowise/workflow.json`,
-configure a URL apresentada pelo Webhook Trigger e execute:
+Para a execução real, inicie o Flowise, importe `flowise/workflow.json`, configure a URL apresentada pelo Webhook Trigger e execute:
 
 ```bash
 uv run python -m condominium_incident_agent.main examples/input_medium.json
@@ -157,10 +132,7 @@ uv run python -m condominium_incident_agent.main examples/input_medium.json
 
 ## Resultado
 
-A automação demonstra trigger HTTP, integração com a aplicação principal,
-processamento visual no Flowise, saída operacional utilizável e evidência
-correlacionada e reproduzível. O Flowise influencia o fluxo real sem assumir
-decisões críticas nem introduzir dependência obrigatória para o registro local.
+A automação demonstra trigger HTTP, integração com a aplicação principal, processamento visual no Flowise, saída operacional utilizável e evidência correlacionada e reproduzível. O Flowise influencia o fluxo real sem assumir decisões críticas nem introduzir dependência obrigatória para o registro local.
 
 ## Limitações conhecidas
 
