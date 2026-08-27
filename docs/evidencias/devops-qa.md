@@ -178,6 +178,44 @@ como `BUILD_STAGE_NOT_SUCCESSFUL`, com risco `20/25 (CRITICAL)`, pois um pacote
 que não pode ser construído não deve ser entregue. O GitHub Actions determinará
 se a anomalia é local ou reproduzível no ambiente oficial.
 
+### Confirmação no GitHub Actions
+
+A execução real no runner gratuito `ubuntu-24.04` concluiu todas as etapas:
+
+```text
+Ruff: All checks passed!
+pytest: 226 passed in 8.03s
+build: source distribution e wheel construídos com sucesso
+risco: LOW (1/25)
+anomalias: nenhuma
+quality gate: aprovado
+```
+
+O JUnit registrou 226 testes e duração de 8,028 segundos, abaixo do limite de
+anomalia de 15 segundos (`1,5x` o baseline de 10 segundos). O build produziu:
+
+```text
+dist/condominium_incident_agent-1.0.0.tar.gz
+dist/condominium_incident_agent-1.0.0-py3-none-any.whl
+```
+
+Essa execução confirma que a falha local de build estava restrita à resolução
+de certificado e dependências do ambiente Windows utilizado na auditoria, e não
+ao código ou à configuração de build do projeto.
+
+O artifact `ci-quality-evidence` publicou os seis arquivos esperados, com
+tamanho final de 5.679 bytes. A execução pode ser consultada em:
+
+```text
+https://github.com/lucasivanv/condominium-incident-agent/actions/runs/33026361388
+```
+
+O runner também emitiu avisos de depreciação do runtime Node.js 20 declarado
+pelas actions oficiais utilizadas. O próprio GitHub executou essas actions com
+Node.js 24, e os avisos não alteraram outcomes, artifacts ou quality gate. Eles
+representam manutenção futura das versões das actions, não uma falha atual da
+aplicação.
+
 ## Resultados reproduzíveis
 
 Validações concluídas nesta alteração:
@@ -187,6 +225,8 @@ Ruff do projeto completo: aprovado
 Testes do analisador: 11 passed
 Pipeline saudável simulado com JUnit real: LOW (1/25), sem anomalia
 Build local indisponível: CRITICAL (20/25), BUILD_STAGE_NOT_SUCCESSFUL
+GitHub Actions: 226 passed, build aprovado, LOW (1/25), sem anomalia
+Artifact remoto: 6 arquivos publicados
 ```
 
 Comandos locais:
@@ -216,5 +256,5 @@ relatórios de risco. O resumo Markdown também é exibido na página da execuç
 - O parser utiliza os totais do JUnit e não mede cobertura de código.
 - A análise de IA é evidence-based, mas exige validação dos logs e não substitui
   exit codes, testes ou revisão humana.
-- A execução remota do GitHub Actions depende de `push` ou `pull_request` e não
-  pode ser produzida apenas pelo repositório local.
+- Novas execuções remotas dependem de `push` ou `pull_request`; a evidência acima
+  corresponde ao run `33026361388`.
