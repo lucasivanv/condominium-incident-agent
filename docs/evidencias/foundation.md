@@ -86,7 +86,7 @@ uv run ruff check .
 uv build
 ```
 
-A execução documentada da Task 09 no GitHub Actions confirmou 226 testes, Ruff e build aprovados, risco `LOW (1/25)` e nenhuma anomalia. Como o hardening foi implementado depois desse run, a confirmação da suíte final permanece centralizada no checklist de entrega, sem transformar o resultado histórico em resultado atual.
+A execução final no GitHub Actions após o hardening confirmou Ruff aprovado, 235 testes aprovados em 7,14 segundos, build dos pacotes concluído, risco `LOW (1/25)`, nenhuma anomalia, seis arquivos de evidência publicados e quality gate aprovado.
 
 ## 6. Limitações atuais
 

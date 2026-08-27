@@ -116,7 +116,7 @@ O cenário E2E `test_prompt_injection_cannot_approve_persist_or_call_flowise` us
 - ausência de chamada ao Flowise;
 - ausência do segredo na resposta e nos sinais de observabilidade.
 
-Testes adicionais verificam minimização da lista de visitantes e sanitização do retorno externo. O Ruff passou após a alteração. A evidência de segurança registra que a suíte completa posterior ao hardening ainda precisa ser confirmada pelo GitHub Actions; o último CI documentado antes desse refinamento teve 226 testes, lint e build aprovados.
+Testes adicionais verificam minimização da lista de visitantes e sanitização do retorno externo. A execução final do GitHub Actions após o refinamento confirmou Ruff aprovado, 235 testes aprovados em 7,14 segundos, build concluído, risco `LOW (1/25)`, nenhuma anomalia e quality gate aprovado.
 
 ### Análise crítica
 

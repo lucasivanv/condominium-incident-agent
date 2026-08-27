@@ -110,7 +110,7 @@ uv run pytest -q
 uv run ruff check src tests
 ```
 
-Antes deste hardening, o GitHub Actions confirmou 226 testes, build e Ruff aprovados. Após as alterações, o Ruff do projeto passou. A execução local dos testes afetados não iniciou porque o host recusou o processo privilegiado e o sandbox não conseguiu consultar o interpretador Python; a confirmação da nova suíte deve ser realizada pelo GitHub Actions.
+O GitHub Actions executado após o hardening confirmou Ruff aprovado, 235 testes aprovados em 7,14 segundos, build dos pacotes concluído, risco `LOW (1/25)`, nenhuma anomalia e quality gate aprovado. Essa execução inclui os testes adversariais, de sanitização, aprovação humana e integração Flowise adicionados nesta etapa.
 
 ## Limitações conhecidas
 

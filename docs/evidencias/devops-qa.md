@@ -1,6 +1,6 @@
 # DevOps Inteligente e QA Assistido por IA
 
-**Data da evidência:** 2026-08-26 **Escopo:** CI, lint, testes, build, code review assistido por IA, detecção de anomalias, estimativa de risco e priorização de testes.
+**Data da evidência:** 2026-08-27 **Escopo:** CI, lint, testes, build, code review assistido por IA, detecção de anomalias, estimativa de risco e priorização de testes.
 
 ## Objetivo
 
@@ -130,9 +130,9 @@ Failed to resolve requirements from build-system.requires
 invalid peer certificate: UnknownIssuer
 ```
 
-**Análise da IA:** o `pyproject.toml` declara corretamente `hatchling` em `build-system.requires`. O build isolado tentou obter o backend e falhou por certificado da rede; o build sem isolamento confirmou que o backend não está instalado neste ambiente. Não há evidência de erro no pacote neste log, mas a etapa continua operacionalmente indisponível. O detector classificou o outcome como `BUILD_STAGE_NOT_SUCCESSFUL`, com risco `20/25 (CRITICAL)`, pois um pacote que não pode ser construído não deve ser entregue. O GitHub Actions determinará se a anomalia é local ou reproduzível no ambiente oficial.
+**Análise da IA:** o `pyproject.toml` declara corretamente `hatchling` em `build-system.requires`. O build isolado tentou obter o backend e falhou por certificado da rede; o build sem isolamento confirmou que o backend não está instalado neste ambiente. Não havia evidência de erro no pacote nesse log, mas a etapa local estava operacionalmente indisponível. O detector classificou o outcome como `BUILD_STAGE_NOT_SUCCESSFUL`, com risco `20/25 (CRITICAL)`, pois um pacote que não pode ser construído não deve ser entregue. As execuções posteriores no GitHub Actions confirmaram que a anomalia era restrita ao ambiente Windows local.
 
-### Confirmação no GitHub Actions
+### Confirmação inicial no GitHub Actions
 
 A execução real no runner gratuito `ubuntu-24.04` concluiu todas as etapas:
 
@@ -162,6 +162,29 @@ https://github.com/lucasivanv/condominium-incident-agent/actions/runs/3302636138
 
 O runner também emitiu avisos de depreciação do runtime Node.js 20 declarado pelas actions oficiais utilizadas. O próprio GitHub executou essas actions com Node.js 24, e os avisos não alteraram outcomes, artifacts ou quality gate. Eles representam manutenção futura das versões das actions, não uma falha atual da aplicação.
 
+### Validação final após o hardening
+
+O Pull Request #23 executou novamente o pipeline completo no runner gratuito `ubuntu-24.04`, com Python 3.12.14 e uv 0.12.7. O run final apresentou:
+
+```text
+Ruff: All checks passed!
+pytest: 235 passed in 7.14s
+build: source distribution e wheel construídos com sucesso
+risco: LOW (1/25)
+anomalias: nenhuma
+quality gate: aprovado
+```
+
+O JUnit registrou 235 testes e duração de 7,134 segundos, abaixo do limite de anomalia de 15 segundos. O build produziu novamente `condominium_incident_agent-1.0.0.tar.gz` e `condominium_incident_agent-1.0.0-py3-none-any.whl`.
+
+O artifact `ci-quality-evidence` publicou os seis arquivos esperados, com 5.847 bytes, digest SHA-256 `dab4c78730f57a0b1b58f815f5337c8ebbbba186475aa2c4b8b8b0ca9710cd5c` e ID `9668305022`. A execução final está disponível em:
+
+```text
+https://github.com/lucasivanv/condominium-incident-agent/actions/runs/33125840009
+```
+
+Os avisos de depreciação do Node.js 20 permaneceram informativos: o GitHub forçou as actions oficiais a executar com Node.js 24 e nenhum outcome foi afetado.
+
 ## Resultados reproduzíveis
 
 Validações concluídas nesta alteração:
@@ -171,7 +194,7 @@ Ruff do projeto completo: aprovado
 Testes do analisador: 11 passed
 Pipeline saudável simulado com JUnit real: LOW (1/25), sem anomalia
 Build local indisponível: CRITICAL (20/25), BUILD_STAGE_NOT_SUCCESSFUL
-GitHub Actions: 226 passed, build aprovado, LOW (1/25), sem anomalia
+GitHub Actions final: 235 passed, build aprovado, LOW (1/25), sem anomalia
 Artifact remoto: 6 arquivos publicados
 ```
 
@@ -199,4 +222,4 @@ No GitHub Actions, o artifact `ci-quality-evidence` contém logs, JUnit e os rel
 - O baseline de duração precisa ser revisto com execuções reais do CI.
 - O parser utiliza os totais do JUnit e não mede cobertura de código.
 - A análise de IA é evidence-based, mas exige validação dos logs e não substitui exit codes, testes ou revisão humana.
-- Novas execuções remotas dependem de `push` ou `pull_request`; a evidência acima corresponde ao run `33026361388`.
+- Novas execuções remotas dependem de `push` ou `pull_request`; a evidência final corresponde ao run `33125840009`.

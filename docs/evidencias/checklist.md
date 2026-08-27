@@ -5,7 +5,6 @@
 ## Legenda
 
 - **Atendido:** implementação e evidência versionada localizadas.
-- **Atendido; validar execução final:** implementação e testes existem, mas a execução posterior à alteração ainda deve ser registrada pelo CI.
 - **Pendente:** não concluído dentro do escopo atual.
 - **Manual externo:** depende de GitHub, YouTube ou outra interface externa.
 
@@ -22,7 +21,7 @@
 | 7 | LangGraph com state, nodes, edges, ramificação e paralelização | **Atendido** | [Arquitetura](architecture.md), `graph.py`, `state.py` e `test_graph_flow.py` | `uv run pytest tests/integration/test_graph_flow.py -q` |
 | 8 | Tool integrada com validação e falhas | **Atendido** | `flowise_webhook.py`, [evidência low-code](low-code.md) e `test_flowise_webhook.py` cobrem POST, Pydantic, correlação, timeout e erros | `uv run pytest tests/unit/test_flowise_webhook.py -q` |
 | 9 | Memória ou recuperação contextual | **Atendido** | [Memória](memory.md), `MemorySaver`, sessão persistente, fan-out de contexto e tool de histórico | Executar os testes indicados em `memory.md` |
-| 10 | Segurança e limites de autonomia | **Atendido; validar execução final** | [Segurança](security.md), [refinamento](prompts-model-refinement.md), aprovação HMAC e teste adversarial E2E | `uv run pytest tests/integration/test_graph_flow.py -k prompt_injection -q` e GitHub Actions |
+| 10 | Segurança e limites de autonomia | **Atendido** | [Segurança](security.md), [refinamento](prompts-model-refinement.md), aprovação HMAC, teste adversarial E2E e CI final aprovado | `uv run pytest tests/integration/test_graph_flow.py -k prompt_injection -q` e run `33125840009` |
 | 11 | Dois sinais correlacionados e resiliência | **Atendido** | [Observabilidade](observability.md) registra logs e auditoria por `correlation_id`; [resiliência](resilience.md) cobre timeout, retry, fallback e escrita atômica | Executar testes de observabilidade e resiliência citados nos documentos |
 | 12 | IA em code review e testes priorizados | **Atendido** | [DevOps e QA](devops-qa.md), [estratégia de testes](test-strategy.md) e `PROMPT - code-review.md` registram revisão real, decisões e prioridade P0 | Revisar prompts, testes E2E e matriz de risco |
 | 13 | CI, logs, anomalia e risco | **Atendido** | `.github/workflows/ci.yml`, `ci_analysis.py`, testes do analisador e [evidência DevOps](devops-qa.md) | `uv run pytest tests/unit/test_ci_analysis.py -q` e conferir artifact `ci-quality-evidence` |
@@ -63,9 +62,8 @@
 
 ## Pendências antes da entrega final
 
-1. Executar o GitHub Actions após esta consolidação e após o hardening; registrar o total e o status realmente observados, sem substituir resultados históricos.
-2. Produzir o vídeo apenas na etapa manual posterior.
+1. Produzir o vídeo apenas na etapa manual posterior.
 
 ## Conclusão
 
-Os critérios 2 a 15 possuem implementação ou evidência rastreável e foram registrados como atendidos. O vídeo do critério 1 continua pendente por estar fora do escopo desta etapa. A suíte posterior ao hardening deve ser confirmada pelo pipeline antes de a entrega ser declarada integralmente validada.
+Os critérios 2 a 15 possuem implementação e evidência rastreável e foram registrados como atendidos. A execução final do GitHub Actions, run `33125840009`, confirmou Ruff, 235 testes, build, análise de risco, artifact e quality gate aprovados após o hardening. O vídeo do critério 1 é a única pendência restante.

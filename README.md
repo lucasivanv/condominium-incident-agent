@@ -241,7 +241,7 @@ O pipeline usa recursos compatíveis com GitHub Free e executa:
 
 A IA foi usada para revisar alterações reais, refinar testes e analisar logs de lint, pytest e build. Os testes foram priorizados por risco; o bloqueio de `HIGH` sem aprovação e o cenário de prompt injection são P0.
 
-A execução documentada da Task 09 registrou 226 testes aprovados, build concluído, risco `LOW (1/25)` e nenhuma anomalia. Alterações posteriores de segurança devem ser confirmadas novamente pelo GitHub Actions antes da entrega.
+A execução final do GitHub Actions após o hardening registrou Ruff aprovado, 235 testes aprovados em 7,14 segundos, build concluído, risco `LOW (1/25)`, nenhuma anomalia e quality gate aprovado. O artifact `ci-quality-evidence` publicou os seis arquivos esperados.
 
 Detalhes: [DevOps e QA](docs/evidencias/devops-qa.md) e [estratégia de testes](docs/evidencias/test-strategy.md).
 
