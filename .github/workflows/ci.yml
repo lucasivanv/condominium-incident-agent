@@ -12,8 +12,10 @@ on:
 
 jobs:
   ci:
-    name: Lint, Format, Test & Build
+    name: Lint, Test, Build & Risk Analysis
     runs-on: ubuntu-latest
+    env:
+      CI_ARTIFACT_DIR: ${{ runner.temp }}/ci-artifacts
 
     steps:
       - name: Checkout
@@ -32,11 +34,57 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --all-groups
 
+      - name: Create artifact directory
+        run: mkdir -p "$CI_ARTIFACT_DIR"
+
       - name: Lint (ruff check)
-        run: uv run ruff check .
+        id: lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          uv run ruff check . 2>&1 | tee "$CI_ARTIFACT_DIR/ruff.log"
 
       - name: Run tests
-        run: uv run pytest
+        id: tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          uv run pytest --junitxml="$CI_ARTIFACT_DIR/pytest.xml" 2>&1 | tee "$CI_ARTIFACT_DIR/pytest.log"
 
       - name: Build
-        run: uv build
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          uv build 2>&1 | tee "$CI_ARTIFACT_DIR/build.log"
+
+      - name: Analyze anomalies and failure risk
+        if: always()
+        run: |
+          uv run python -m condominium_incident_agent.ci_analysis \
+            --lint-status "${{ steps.lint.outcome }}" \
+            --test-status "${{ steps.tests.outcome }}" \
+            --build-status "${{ steps.build.outcome }}" \
+            --junit-path "$CI_ARTIFACT_DIR/pytest.xml" \
+            --baseline-duration-seconds 10 \
+            --json-output "$CI_ARTIFACT_DIR/ci-risk-report.json" \
+            --markdown-output "$CI_ARTIFACT_DIR/ci-risk-report.md"
+          cat "$CI_ARTIFACT_DIR/ci-risk-report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-quality-evidence
+          path: ${{ runner.temp }}/ci-artifacts/
+          if-no-files-found: error
+
+      - name: Enforce quality gate
+        if: always()
+        run: |
+          if [[ "${{ steps.lint.outcome }}" != "success" || \
+                "${{ steps.tests.outcome }}" != "success" || \
+                "${{ steps.build.outcome }}" != "success" ]]; then
+            echo "Quality gate failed: lint=${{ steps.lint.outcome }}, tests=${{ steps.tests.outcome }}, build=${{ steps.build.outcome }}"
+            exit 1
+          fi
