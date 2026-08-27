@@ -32,6 +32,8 @@ class AgentState(TypedDict):
             consulta de reincidência e contexto entre interações.
         session_context: Contexto textual recuperado do histórico persistido.
         conversation_context: Histórico conversacional limitado para o prompt.
+        system_instructions: Regras confiáveis enviadas ao LLM como SystemMessage.
+        untrusted_input: Dados da execução enviados separadamente como HumanMessage.
         human_approval: Aprovação externa assinada para ações críticas.
         flowise_delivery_status: Resultado do encaminhamento HTTP externo.
         flowise_delivery_error: Erro sanitizado do encaminhamento, se houver.
@@ -60,6 +62,8 @@ class AgentState(TypedDict):
     session_history: list[dict]
     session_context: str | None
     conversation_context: list[str] | None
+    system_instructions: str | None
+    untrusted_input: str | None
     human_approval: dict | None
     correlation_id: str
     flowise_delivery_status: str | None

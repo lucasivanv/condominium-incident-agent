@@ -124,6 +124,35 @@ def test_flowise_result_is_persisted_in_occurrence_report(tmp_path, monkeypatch)
     assert data["flowise_triage"]["sla_minutes"] == 1440
 
 
+def test_flowise_output_is_sanitized_before_state_and_persistence(tmp_path, monkeypatch):
+    monkeypatch.setenv("FLOWISE_WEBHOOK_URL", "https://flowise.example/webhook")
+    report = tmp_path / "occurrence.json"
+    report.write_text(json.dumps({"occurrence_id": "occ-123"}), encoding="utf-8")
+    response_body = {
+        "status": "PROCESSED",
+        "occurrence_id": "occ-123",
+        "correlation_id": "corr-456",
+        "action": "MONITOR",
+        "priority": "NORMAL",
+        "responsible_team": "SINDICANCIA",
+        "sla_minutes": 1440,
+        "alert_required": False,
+        "diagnostic_summary": "Diagnóstico token=external-secret",
+        "audit_record_id": "flowise-corr-456",
+        "processed_at": "2026-08-25T19:00:00Z",
+    }
+    with patch(
+        "condominium_incident_agent.tools.flowise_webhook.urlopen",
+        return_value=_urlopen_response(body=response_body),
+    ):
+        result = send_to_flowise(_state(output_file=str(report)))
+
+    persisted = json.loads(report.read_text(encoding="utf-8"))
+    assert "external-secret" not in result["flowise_triage"]["diagnostic_summary"]
+    assert "[REDACTED]" in result["flowise_triage"]["diagnostic_summary"]
+    assert "external-secret" not in json.dumps(persisted, ensure_ascii=False)
+
+
 def test_mismatched_flowise_correlation_is_rejected(monkeypatch):
     monkeypatch.setenv("FLOWISE_WEBHOOK_URL", "https://flowise.example/webhook")
     with patch(

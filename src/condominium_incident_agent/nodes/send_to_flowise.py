@@ -5,6 +5,7 @@ import logging
 from condominium_incident_agent.nodes.save_occurrence import (
     update_occurrence_flowise_result,
 )
+from condominium_incident_agent.security import sanitize_untrusted_data
 from condominium_incident_agent.state import AgentState
 from condominium_incident_agent.tools.flowise_webhook import send_occurrence_to_flowise
 
@@ -49,7 +50,7 @@ def send_to_flowise(state: AgentState) -> AgentState:
         "flowise_status": result.get("flowise_status"),
         "flowise_action": result.get("flowise_action"),
         "flowise_processed_at": result.get("flowise_processed_at"),
-        "flowise_triage": result.get("flowise_triage"),
+        "flowise_triage": sanitize_untrusted_data(result.get("flowise_triage")),
     }
     try:
         update_occurrence_flowise_result(updated_state)
