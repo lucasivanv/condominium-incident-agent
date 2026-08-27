@@ -1,7 +1,6 @@
 # Memory — Estratégia de Memória e Contexto
 
-**Data da auditoria:** 2026-08-23
-**Ambiente:** Windows 11, Python 3.12.13, uv, pytest 9.1.1
+**Data da auditoria:** 2026-08-23 **Ambiente:** Windows 11, Python 3.12.13, uv, pytest 9.1.1
 
 ---
 
@@ -25,8 +24,8 @@ O `session.json` é a fonte durável. `session_history` é carregado no estado i
 
 1. `IncidentInput.to_initial_state()` carrega `reports/session.json` para `session_history`.
 2. `prepare_context` extrai uma indicação de apartamento do relato e seleciona ocorrências correspondentes do snapshot.
-3. O contexto selecionado é inserido em `{session_context}` no prompt.
-4. `classify_incident` envia o prompt como mensagem mais recente ao LLM junto com as tools disponíveis.
+3. O contexto selecionado é sanitizado e serializado com o relato dentro de `<untrusted_data>`, em uma `HumanMessage` separada.
+4. `classify_incident` envia o template confiável como `SystemMessage` e os dados da execução como `HumanMessage`, junto com as tools disponíveis.
 5. O LLM pode chamar `get_session_history` para confirmar ou refinar o histórico.
 6. `save_occurrence` grava a ocorrência, atualiza `session.json` e acrescenta a entrada ao `session_history`.
 7. `generate_response` acrescenta a resposta final ao `conversation_history`.
@@ -35,12 +34,7 @@ Quando o contexto pré-carregado e o retorno da tool divergirem, o retorno da to
 
 ### Exemplo de uso
 
-Uma ocorrência anterior de `NOISE` é registrada para o apartamento `302`.
-Em uma nova entrada como `Barulho novamente no apartamento 302`, o
-`prepare_context` recupera essa ocorrência, inclui seu resumo no prompt e
-orienta o LLM a confirmar o histórico com `get_session_history`. Ao identificar
-reincidência da mesma categoria, o agente pode elevar a severidade conforme as
-regras do classificador.
+Uma ocorrência anterior de `NOISE` é registrada para o apartamento `302`. Em uma nova entrada como `Barulho novamente no apartamento 302`, o `prepare_context` recupera essa ocorrência, inclui seu resumo sanitizado nos dados não confiáveis e orienta o LLM a confirmar o histórico com `get_session_history`. Ao identificar reincidência da mesma categoria, o agente pode elevar a severidade conforme as regras do classificador.
 
 ## 4. Recuperação e limites
 
@@ -67,7 +61,7 @@ O fluxo pressupõe processamento sequencial. Chamadas concorrentes entre process
 | ---------------------------------------- | ------------------------------------------------------------------ |
 | `tests/unit/test_prepare_context.py`     | Extração de apartamento, contexto granular e limite conversacional |
 | `tests/unit/test_get_session_history.py` | Filtros, limites, contagens e campos nulos                         |
-| `tests/unit/test_classify_incident.py`   | Envio do prompt preparado ao LLM                                   |
+| `tests/unit/test_classify_incident.py`   | Separação entre instruções de sistema e contexto não confiável      |
 | `tests/unit/test_save_occurrence.py`     | Persistência, snapshot do estado e escrita atômica                 |
 | `tests/unit/test_session.py`             | Leitura, recuperação de corrupção e escrita atômica da sessão      |
 | `tests/integration/test_graph_flow.py`   | Pré-carregamento, persistência e uso do contexto no fluxo completo |

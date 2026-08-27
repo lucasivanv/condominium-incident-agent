@@ -62,11 +62,11 @@ def main() -> None:
         python -m condominium_incident_agent.main <caminho/para/input.json>
 
     Exemplo:
-        python -m condominium_incident_agent.main examples/input.json
+        python -m condominium_incident_agent.main examples/input_low.json
     """
     if len(sys.argv) != 2:
         print("Uso: python -m condominium_incident_agent.main <caminho/para/input.json>")
-        print("Exemplo: python -m condominium_incident_agent.main examples/input.json")
+        print("Exemplo: python -m condominium_incident_agent.main examples/input_low.json")
         sys.exit(1)
 
     try:

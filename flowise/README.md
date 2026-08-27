@@ -65,8 +65,8 @@ uv run python -m condominium_incident_agent.main examples/input_medium.json
 ```
 
 Uma execução bem-sucedida apresenta `Flowise: SENT`, ação, equipe, prioridade,
-SLA e diagnóstico. O mesmo resultado é persistido em `reports/` no campo
-`flowise_triage`, correlacionado ao histórico do Flowise por `correlation_id`.
+SLA e diagnóstico. O `correlation_id` exibido permite relacionar o terminal ao
+histórico de execução do Flowise sem depender de artefatos locais ignorados.
 
 Para validar a integração automatizada:
 
@@ -74,5 +74,5 @@ Para validar a integração automatizada:
 uv run pytest tests/unit/test_flowise_webhook.py -q
 ```
 
-Consulte [`docs/low-code/flowise.md`](../docs/low-code/flowise.md) para o
+Consulte [`docs/evidencias/low-code.md`](../docs/evidencias/low-code.md) para o
 contrato completo, regras de triagem, tratamento de falhas e evidências.
