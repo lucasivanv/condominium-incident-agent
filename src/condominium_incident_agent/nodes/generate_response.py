@@ -3,6 +3,7 @@
 import logging
 
 from condominium_incident_agent.enums import Severity
+from condominium_incident_agent.security import sanitize_untrusted_text
 from condominium_incident_agent.state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -31,25 +32,35 @@ def _format_success(state: AgentState) -> str:
     ]
 
     if state.get("apartment"):
-        lines.append(f"🏠 Apartamento: {state['apartment']}")
+        lines.append(f"🏠 Apartamento: {sanitize_untrusted_text(state['apartment'])}")
 
     if state.get("building"):
-        lines.append(f"🏢 Bloco: {state['building']}")
+        lines.append(f"🏢 Bloco: {sanitize_untrusted_text(state['building'])}")
 
     if state.get("involved_people"):
-        people = ", ".join(state["involved_people"])
+        people = ", ".join(sanitize_untrusted_text(person) for person in state["involved_people"])
         lines.append(f"👥 Envolvidos: {people}")
 
     resident = state.get("resident_info")
     if resident and resident.get("found"):
-        lines.append(f"🔍 Morador cadastrado: {resident.get('resident_name', 'N/A')}")
-        visitors = resident.get("authorized_visitors") or []
-        if visitors:
-            lines.append(f"   Visitantes autorizados: {', '.join(visitors)}")
+        resident_name = sanitize_untrusted_text(
+            str(resident.get("resident_name") or "N/A")
+        )
+        lines.append(f"🔍 Morador cadastrado: {resident_name}")
+        authorized_names = {
+            str(visitor).strip().casefold()
+            for visitor in resident.get("authorized_visitors") or []
+        }
+        involved_names = {
+            str(person).strip().casefold()
+            for person in state.get("involved_people") or []
+        }
+        if authorized_names.intersection(involved_names):
+            lines.append("🔐 Autorização prévia confirmada para visitante mencionado.")
 
     if state.get("summary"):
         lines.append("")
-        lines.append(f"📝 Resumo: {state['summary']}")
+        lines.append(f"📝 Resumo: {sanitize_untrusted_text(state['summary'])}")
 
     if state.get("output_file"):
         lines.append("")
@@ -61,16 +72,25 @@ def _format_success(state: AgentState) -> str:
     if state.get("flowise_delivery_status"):
         lines.append(f"🔗 Flowise: {state['flowise_delivery_status']}")
     if state.get("flowise_action"):
-        lines.append(f"🎯 Ação operacional: {state['flowise_action']}")
+        lines.append(
+            f"🎯 Ação operacional: {sanitize_untrusted_text(state['flowise_action'])}"
+        )
     triage = state.get("flowise_triage") or {}
     if triage.get("responsible_team"):
-        lines.append(f"👷 Equipe responsável: {triage['responsible_team']}")
+        lines.append(
+            f"👷 Equipe responsável: {sanitize_untrusted_text(triage['responsible_team'])}"
+        )
     if triage.get("priority"):
-        lines.append(f"📌 Prioridade operacional: {triage['priority']}")
+        lines.append(
+            f"📌 Prioridade operacional: {sanitize_untrusted_text(triage['priority'])}"
+        )
     if triage.get("sla_minutes") is not None:
         lines.append(f"⏱️ Prazo de atendimento: {triage['sla_minutes']} min")
     if triage.get("diagnostic_summary"):
-        lines.append(f"📊 Diagnóstico Flowise: {triage['diagnostic_summary']}")
+        lines.append(
+            "📊 Diagnóstico Flowise: "
+            f"{sanitize_untrusted_text(triage['diagnostic_summary'])}"
+        )
 
     return "\n".join(lines)
 
@@ -88,9 +108,12 @@ def _format_error(state: AgentState) -> str:
         "❌ A ocorrência não foi registrada.",
         "",
         f"🆔 ID: {state.get('occurrence_id', 'N/A')}",
-        f"📋 Relato recebido: {state.get('user_input', '')}",
+        f"📋 Relato recebido: {sanitize_untrusted_text(state.get('user_input', ''))}",
         "",
-        f"⚠️  Motivo: {state.get('classification_error', 'Erro desconhecido')}",
+        (
+            "⚠️  Motivo: "
+            f"{sanitize_untrusted_text(state.get('classification_error', 'Erro desconhecido'))}"
+        ),
         "",
         "Por favor, verifique o motivo e tente novamente.",
     ]

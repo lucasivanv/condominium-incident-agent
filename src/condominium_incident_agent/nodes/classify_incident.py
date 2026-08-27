@@ -3,7 +3,7 @@
 import json
 import logging
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from condominium_incident_agent.enums import Category, Severity
@@ -93,7 +93,12 @@ def classify_incident(state: AgentState) -> AgentState:
     llm = get_llm()
     llm_with_tools = with_llm_retry(llm.bind_tools(TOOLS))
 
-    messages = [HumanMessage(content=prompt_text)]
+    system_instructions = state.get("system_instructions")
+    untrusted_input = state.get("untrusted_input") or prompt_text
+    messages = []
+    if system_instructions:
+        messages.append(SystemMessage(content=system_instructions))
+    messages.append(HumanMessage(content=untrusted_input))
     resident_info: dict | None = None
     ai_message: AIMessage | None = None
 

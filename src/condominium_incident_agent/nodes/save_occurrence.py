@@ -24,6 +24,11 @@ REPORTS_DIR = _BASE_DIR / "reports"
 ESCALATED_DIR = REPORTS_DIR / "escalated"
 
 
+def _sanitize_optional_text(value: object) -> str | None:
+    """Sanitiza campos textuais opcionais antes de qualquer persistência."""
+    return sanitize_untrusted_text(str(value)) if value is not None else None
+
+
 def _write_json_atomic(path: Path, payload: dict) -> None:
     """Escreve um JSON e substitui o destino somente após concluir a escrita."""
     fd, tmp_path = tempfile.mkstemp(
@@ -105,8 +110,8 @@ def update_occurrence_flowise_result(state: AgentState) -> None:
             "flowise_correlation_id": state.get("correlation_id"),
             "flowise_processed_at": state.get("flowise_processed_at"),
             "flowise_delivery_status": state.get("flowise_delivery_status"),
-            "flowise_error": state.get("flowise_delivery_error"),
-            "flowise_triage": state.get("flowise_triage"),
+            "flowise_error": sanitize_untrusted_data(state.get("flowise_delivery_error")),
+            "flowise_triage": sanitize_untrusted_data(state.get("flowise_triage")),
         }
     )
     _write_json_atomic(path, payload)
@@ -130,8 +135,8 @@ def _save_occurrence(state: AgentState) -> AgentState:
         "category": category.value if category is not None else None,
         "severity": severity.value if severity is not None else None,
         "involved_people": sanitize_untrusted_data(state.get("involved_people") or []),
-        "apartment": state.get("apartment"),
-        "building": state.get("building"),
+        "apartment": _sanitize_optional_text(state.get("apartment")),
+        "building": _sanitize_optional_text(state.get("building")),
         "summary": sanitize_untrusted_text(state.get("summary") or ""),
         "resident_info": sanitize_untrusted_data(state.get("resident_info")),
         "saved_at": datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -145,12 +150,12 @@ def _save_occurrence(state: AgentState) -> AgentState:
     session_entry = {
         "occurrence_id": occurrence_id,
         "reported_at": state.get("reported_at"),
-        "reported_by": state.get("reported_by"),
+        "reported_by": sanitize_untrusted_text(state.get("reported_by") or ""),
         "category": category.value if category is not None else None,
         "severity": severity.value if severity is not None else None,
         "summary": sanitize_untrusted_text(state.get("summary") or ""),
-        "apartment": state.get("apartment"),
-        "building": state.get("building"),
+        "apartment": _sanitize_optional_text(state.get("apartment")),
+        "building": _sanitize_optional_text(state.get("building")),
     }
     append_to_session(session_entry)
 

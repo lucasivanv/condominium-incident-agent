@@ -108,6 +108,43 @@ class TestSaveOccurrence:
         assert data["severity"] == "LOW"
         assert data["apartment"] == "302"
 
+    def test_secrets_are_redacted_from_report_and_session_entry(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.REPORTS_DIR", tmp_path
+        )
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.ESCALATED_DIR",
+            tmp_path / "escalated",
+        )
+        mock_append = MagicMock()
+        monkeypatch.setattr(
+            "condominium_incident_agent.nodes.save_occurrence.append_to_session",
+            mock_append,
+        )
+        state = _make_state(
+            user_input="Relato token=input-secret",
+            reported_by="Porteiro token=reporter-secret",
+            apartment="token=apartment-secret",
+            summary="Resumo token=summary-secret",
+        )
+
+        result = save_occurrence(state)
+
+        persisted = Path(result["output_file"]).read_text(encoding="utf-8")
+        session_entry = json.dumps(mock_append.call_args.args[0], ensure_ascii=False)
+        for secret in (
+            "input-secret",
+            "reporter-secret",
+            "apartment-secret",
+            "summary-secret",
+        ):
+            assert secret not in persisted
+            assert secret not in session_entry
+        assert "[REDACTED]" in persisted
+        assert "[REDACTED]" in session_entry
+
     def test_output_file_path_set_in_state(self, tmp_path, monkeypatch):
         """O campo output_file no estado deve apontar para o arquivo criado."""
         monkeypatch.setattr(
