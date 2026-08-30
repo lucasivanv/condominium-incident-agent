@@ -1,6 +1,6 @@
 # Checklist dos Critérios de Avaliação
 
-**Data da consolidação:** 2026-08-27 **Fonte:** Projeto Avaliativo M2S08, critérios 1 a 15. **Escopo desta entrega:** documentação técnica, evidências e README principal; vídeo não incluído.
+**Data da consolidação:** 2026-08-29 **Fonte:** Projeto Avaliativo M2S08, critérios 1 a 15. **Escopo desta entrega:** implementação, documentação técnica, evidências, README principal e vídeo de demonstração.
 
 ## Legenda
 
@@ -12,7 +12,7 @@
 
 | Nº | Critério resumido | Status | Implementação e evidência | Reprodução ou verificação |
 | ---: | --- | --- | --- | --- |
-| 1 | Vídeo de demonstração | **Pendente — fora do escopo** | Não produzido nesta task por solicitação explícita | Atividade manual futura |
+| 1 | Vídeo de demonstração | **Atendido** | Vídeo produzido, publicado e referenciado no README principal | Conferir a demonstração dos cenários e das evidências do projeto |
 | 2 | Escopo organizado em cards | **Atendido** | GitHub Project organizado com cards relacionados às atividades do projeto, conforme confirmação do responsável | Conferir descrições e vínculos dos cards no GitHub Project |
 | 3 | Movimentação real dos cards | **Atendido** | Evolução dos cards registrada no quadro durante o desenvolvimento, conforme confirmação do responsável | Conferir histórico e situação final dos cards no GitHub Project |
 | 4 | Branches, commits e fluxo de versionamento | **Atendido** | Histórico contém feature branches, PRs, merges e commits semânticos; exemplos: `f201496`, `0d1ce34` e `0142457` | `git log --graph --oneline --decorate --all` e aba de Pull Requests |
@@ -58,12 +58,8 @@
 - [x] Documentar um ciclo real de refinamento.
 - [x] Criar o prompt desta task no padrão do projeto.
 - [x] Revisar e atualizar o `README.md` principal.
-- [ ] Criar roteiro e gravar vídeo — fora do escopo solicitado.
-
-## Pendências antes da entrega final
-
-1. Produzir o vídeo apenas na etapa manual posterior.
+- [x] Criar roteiro e gravar vídeo.
 
 ## Conclusão
 
-Os critérios 2 a 15 possuem implementação e evidência rastreável e foram registrados como atendidos. A execução final do GitHub Actions, run `33125840009`, confirmou Ruff, 235 testes, build, análise de risco, artifact e quality gate aprovados após o hardening. O vídeo do critério 1 é a única pendência restante.
+Os critérios 1 a 15 possuem implementação e evidência rastreável e foram registrados como atendidos. A execução final do GitHub Actions, run `33125840009`, confirmou Ruff, 235 testes, build, análise de risco, artifact e quality gate aprovados após o hardening. O vídeo de demonstração foi publicado no YouTube e vinculado no README principal.

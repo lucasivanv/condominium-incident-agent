@@ -139,7 +139,7 @@ A consulta confirma os nodes do caminho executado, incluindo `validate_input`, o
 
 ## Resultado
 
-A implementação adiciona rastreabilidade a todos os nodes registrados pelo grafo sem alterar suas regras de negócio. Na validação realizada, os testes específicos de observabilidade passaram com 4 testes e a suíte completa passou com 201 testes.
+A implementação adiciona rastreabilidade a todos os nodes registrados pelo grafo sem alterar suas regras de negócio. Na validação original desta etapa, os 4 testes específicos de observabilidade e os 201 testes então existentes passaram. Após as evoluções posteriores e o hardening, a execução final registrada no GitHub Actions aprovou 235 testes, preservando os cenários de observabilidade.
 
 ## Limitações conhecidas
 

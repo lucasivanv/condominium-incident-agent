@@ -1,7 +1,7 @@
 [project]
 name = "condominium-incident-agent"
 version = "1.0.0"
-description = "Add your description here"
+description = "Agente LangGraph para classificação segura e triagem de ocorrências condominiais"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
