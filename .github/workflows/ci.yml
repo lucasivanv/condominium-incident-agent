@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  ci:
+    name: Lint, Test, Build & Risk Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups
+
+      - name: Create artifact directory
+        run: mkdir -p "$RUNNER_TEMP/ci-artifacts"
+
+      - name: Lint (ruff check)
+        id: lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          uv run ruff check . 2>&1 | tee "$RUNNER_TEMP/ci-artifacts/ruff.log"
+
+      - name: Run tests
+        id: tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          uv run pytest --junitxml="$RUNNER_TEMP/ci-artifacts/pytest.xml" 2>&1 | tee "$RUNNER_TEMP/ci-artifacts/pytest.log"
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          uv build 2>&1 | tee "$RUNNER_TEMP/ci-artifacts/build.log"
+
+      - name: Analyze anomalies and failure risk
+        if: always()
+        run: |
+          uv run python -m condominium_incident_agent.ci_analysis \
+            --lint-status "${{ steps.lint.outcome }}" \
+            --test-status "${{ steps.tests.outcome }}" \
+            --build-status "${{ steps.build.outcome }}" \
+            --junit-path "$RUNNER_TEMP/ci-artifacts/pytest.xml" \
+            --baseline-duration-seconds 10 \
+            --json-output "$RUNNER_TEMP/ci-artifacts/ci-risk-report.json" \
+            --markdown-output "$RUNNER_TEMP/ci-artifacts/ci-risk-report.md"
+          cat "$RUNNER_TEMP/ci-artifacts/ci-risk-report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-quality-evidence
+          path: ${{ runner.temp }}/ci-artifacts/
+          if-no-files-found: error
+
+      - name: Enforce quality gate
+        if: always()
+        run: |
+          if [[ "${{ steps.lint.outcome }}" != "success" || \
+                "${{ steps.tests.outcome }}" != "success" || \
+                "${{ steps.build.outcome }}" != "success" ]]; then
+            echo "Quality gate failed: lint=${{ steps.lint.outcome }}, tests=${{ steps.tests.outcome }}, build=${{ steps.build.outcome }}"
+            exit 1
+          fi

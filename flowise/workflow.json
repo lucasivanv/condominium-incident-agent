@@ -1,0 +1,184 @@
+{
+  "name": "condominium-occurrence-triage",
+  "description": "Webhook de triagem operacional e auditoria de ocorrencias autorizadas.",
+  "type": "AGENTFLOW",
+  "version": "3.1.3",
+  "nodes": [
+    {
+      "id": "startAgentflow_0",
+      "type": "agentFlow",
+      "position": {"x": 0, "y": 160},
+      "data": {
+        "id": "startAgentflow_0",
+        "label": "Webhook POST - ocorrencia autorizada",
+        "version": 1.4,
+        "name": "startAgentflow",
+        "type": "Start",
+        "color": "#7EE787",
+        "hideInput": true,
+        "baseClasses": ["Start"],
+        "category": "Agent Flows",
+        "description": "Starting point of the agentflow",
+        "inputParams": [
+          {"label":"Input Type","name":"startInputType","type":"options","options":[{"label":"Chat Input","name":"chatInput"},{"label":"Webhook Trigger","name":"webhookTrigger","client":["agentflowv2"]}],"default":"chatInput","id":"startAgentflow_0-input-startInputType-options","display":true},
+          {"label":"HTTP Method","name":"webhookMethod","type":"options","options":[{"label":"POST","name":"POST"}],"default":"POST","show":{"startInputType":"webhookTrigger"},"id":"startAgentflow_0-input-webhookMethod-options","display":true},
+          {"label":"Content Type","name":"webhookContentType","type":"options","options":[{"label":"application/json","name":"application/json"}],"default":"application/json","show":{"startInputType":"webhookTrigger"},"id":"startAgentflow_0-input-webhookContentType-options","display":true},
+          {"label":"Input Mode","name":"webhookInputMode","type":"options","options":[{"label":"No Input","name":"none"},{"label":"Full Webhook Payload","name":"payload"}],"default":"none","show":{"startInputType":"webhookTrigger"},"id":"startAgentflow_0-input-webhookInputMode-options","display":true},
+          {"label":"Response Mode","name":"webhookResponseMode","type":"options","options":[{"label":"Synchronous","name":"sync"}],"default":"sync","show":{"startInputType":"webhookTrigger"},"id":"startAgentflow_0-input-webhookResponseMode-options","display":true},
+          {"label":"Ephemeral Memory","name":"startEphemeralMemory","type":"boolean","optional":true,"id":"startAgentflow_0-input-startEphemeralMemory-boolean","display":true},
+          {"label":"Flow State","name":"startState","type":"array","optional":true,"array":[{"label":"Key","name":"key","type":"string"},{"label":"Value","name":"value","type":"string","optional":true}],"id":"startAgentflow_0-input-startState-array","display":true}
+        ],
+        "inputAnchors": [],
+        "inputs": {"startInputType":"webhookTrigger","webhookMethod":"POST","webhookContentType":"application/json","webhookInputMode":"none","webhookResponseMode":"sync","webhookEnableAuth":false,"webhookEnableValidation":false,"startEphemeralMemory":true,"startState":[]},
+        "outputAnchors": [{"id":"startAgentflow_0-output-startAgentflow","label":"Start","name":"startAgentflow"}],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 220,
+      "height": 66,
+      "selected": false,
+      "positionAbsolute": {"x": 0, "y": 160},
+      "dragging": false
+    },
+    {
+      "id": "customFunctionAgentflow_0",
+      "type": "agentFlow",
+      "position": {"x": 300, "y": 160},
+      "data": {
+        "id": "customFunctionAgentflow_0",
+        "label": "Validar contrato e correlacao",
+        "version": 1.1,
+        "name": "customFunctionAgentflow",
+        "type": "CustomFunction",
+        "color": "#E4B7FF",
+        "baseClasses": ["CustomFunction"],
+        "category": "Agent Flows",
+        "description": "Execute custom function",
+        "inputParams": [
+          {"label":"Input Variables","name":"customFunctionInputVariables","type":"array","optional":true,"acceptVariable":true,"array":[{"label":"Variable Name","name":"variableName","type":"string"},{"label":"Variable Value","name":"variableValue","type":"string","acceptVariable":true}],"id":"customFunctionAgentflow_0-input-customFunctionInputVariables-array","display":true},
+          {"label":"Javascript Function","name":"customFunctionJavascriptFunction","type":"code","id":"customFunctionAgentflow_0-input-customFunctionJavascriptFunction-code","display":true},
+          {"label":"Update Flow State","name":"customFunctionUpdateState","type":"array","optional":true,"acceptVariable":true,"array":[{"label":"Key","name":"key","type":"asyncOptions","loadMethod":"listRuntimeStateKeys","freeSolo":true},{"label":"Value","name":"value","type":"string","acceptVariable":true,"acceptNodeOutputAsVariable":true}],"id":"customFunctionAgentflow_0-input-customFunctionUpdateState-array","display":true}
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "customFunctionInputVariables": [{"variableName":"rawInput","variableValue":"{{$webhook.body}}"}],
+          "customFunctionJavascriptFunction": "const payload = typeof $rawInput === 'string' ? (() => { try { return JSON.parse($rawInput); } catch (_) { return null; } })() : $rawInput;\nconst errors = [];\nconst required = ['occurrence_id','correlation_id','reported_at','category','severity','summary'];\nfor (const field of required) { if (!payload || typeof payload[field] !== 'string' || !payload[field].trim()) errors.push(field + ' obrigatorio'); }\nconst categories = ['ACCESS','PACKAGE','NOISE','MAINTENANCE','SECURITY','OTHER'];\nconst severities = ['LOW','MEDIUM','HIGH'];\nif (payload && !categories.includes(payload.category)) errors.push('category invalida');\nif (payload && !severities.includes(payload.severity)) errors.push('severity invalida');\nif (!payload || !Array.isArray(payload.involved_people)) errors.push('involved_people deve ser lista');\nreturn JSON.stringify({status: errors.length ? 'REJECTED' : 'VALIDATED', occurrence_id: payload?.occurrence_id || null, correlation_id: payload?.correlation_id || null, payload: errors.length ? null : payload, errors});",
+          "customFunctionUpdateState": []
+        },
+        "outputAnchors": [{"id":"customFunctionAgentflow_0-output-customFunctionAgentflow","label":"Custom Function","name":"customFunctionAgentflow"}],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 220,
+      "height": 66,
+      "selected": false,
+      "positionAbsolute": {"x": 300, "y": 160},
+      "dragging": false
+    },
+    {
+      "id": "customFunctionAgentflow_1",
+      "type": "agentFlow",
+      "position": {"x": 600, "y": 160},
+      "data": {
+        "id": "customFunctionAgentflow_1",
+        "label": "Triagem operacional",
+        "version": 1.1,
+        "name": "customFunctionAgentflow",
+        "type": "CustomFunction",
+        "color": "#E4B7FF",
+        "baseClasses": ["CustomFunction"],
+        "category": "Agent Flows",
+        "description": "Execute custom function",
+        "inputParams": [
+          {"label":"Input Variables","name":"customFunctionInputVariables","type":"array","optional":true,"acceptVariable":true,"array":[{"label":"Variable Name","name":"variableName","type":"string"},{"label":"Variable Value","name":"variableValue","type":"string","acceptVariable":true}],"id":"customFunctionAgentflow_1-input-customFunctionInputVariables-array","display":true},
+          {"label":"Javascript Function","name":"customFunctionJavascriptFunction","type":"code","id":"customFunctionAgentflow_1-input-customFunctionJavascriptFunction-code","display":true},
+          {"label":"Update Flow State","name":"customFunctionUpdateState","type":"array","optional":true,"acceptVariable":true,"array":[{"label":"Key","name":"key","type":"asyncOptions","loadMethod":"listRuntimeStateKeys","freeSolo":true},{"label":"Value","name":"value","type":"string","acceptVariable":true,"acceptNodeOutputAsVariable":true}],"id":"customFunctionAgentflow_1-input-customFunctionUpdateState-array","display":true}
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "customFunctionInputVariables": [{"variableName":"validation","variableValue":"<p><span class=\"variable\" data-type=\"mention\" data-id=\"customFunctionAgentflow_0\" data-label=\"customFunctionAgentflow_0\">{{ customFunctionAgentflow_0.output.content }}</span></p>"}],
+          "customFunctionJavascriptFunction": "const validation = typeof $validation === 'string' ? (() => { try { return JSON.parse($validation); } catch (_) { return {}; } })() : $validation;\nif (validation.status !== 'VALIDATED') return JSON.stringify({status:'REJECTED', occurrence_id:validation.occurrence_id || null, correlation_id:validation.correlation_id || null, errors:validation.errors || ['payload rejeitado']});\nconst p = validation.payload;\nconst severityRules = {LOW:{action:'MONITOR',priority:'NORMAL',sla_minutes:1440,alert_required:false},MEDIUM:{action:'REVIEW',priority:'URGENT',sla_minutes:240,alert_required:false},HIGH:{action:'PRIORITIZE',priority:'CRITICAL',sla_minutes:30,alert_required:true}};\nconst teams = {ACCESS:'PORTARIA',PACKAGE:'PORTARIA',NOISE:'SINDICANCIA',MAINTENANCE:'MANUTENCAO',SECURITY:'SEGURANCA',OTHER:'ADMINISTRACAO'};\nconst rule = severityRules[p.severity]; const team = teams[p.category];\nreturn JSON.stringify({status:'PROCESSED',occurrence_id:p.occurrence_id,correlation_id:p.correlation_id,action:rule.action,priority:rule.priority,responsible_team:team,sla_minutes:rule.sla_minutes,alert_required:rule.alert_required,diagnostic_summary:p.category + '/' + p.severity + ': encaminhar para ' + team + ' em ate ' + rule.sla_minutes + ' minutos.',errors:[]});",
+          "customFunctionUpdateState": []
+        },
+        "outputAnchors": [{"id":"customFunctionAgentflow_1-output-customFunctionAgentflow","label":"Custom Function","name":"customFunctionAgentflow"}],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 220,
+      "height": 66,
+      "selected": false,
+      "positionAbsolute": {"x": 600, "y": 160},
+      "dragging": false
+    },
+    {
+      "id": "customFunctionAgentflow_2",
+      "type": "agentFlow",
+      "position": {"x": 900, "y": 160},
+      "data": {
+        "id": "customFunctionAgentflow_2",
+        "label": "Gerar registro de auditoria",
+        "version": 1.1,
+        "name": "customFunctionAgentflow",
+        "type": "CustomFunction",
+        "color": "#E4B7FF",
+        "baseClasses": ["CustomFunction"],
+        "category": "Agent Flows",
+        "description": "Execute custom function",
+        "inputParams": [
+          {"label":"Input Variables","name":"customFunctionInputVariables","type":"array","optional":true,"acceptVariable":true,"array":[{"label":"Variable Name","name":"variableName","type":"string"},{"label":"Variable Value","name":"variableValue","type":"string","acceptVariable":true}],"id":"customFunctionAgentflow_2-input-customFunctionInputVariables-array","display":true},
+          {"label":"Javascript Function","name":"customFunctionJavascriptFunction","type":"code","id":"customFunctionAgentflow_2-input-customFunctionJavascriptFunction-code","display":true},
+          {"label":"Update Flow State","name":"customFunctionUpdateState","type":"array","optional":true,"acceptVariable":true,"array":[{"label":"Key","name":"key","type":"asyncOptions","loadMethod":"listRuntimeStateKeys","freeSolo":true},{"label":"Value","name":"value","type":"string","acceptVariable":true,"acceptNodeOutputAsVariable":true}],"id":"customFunctionAgentflow_2-input-customFunctionUpdateState-array","display":true}
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "customFunctionInputVariables": [{"variableName":"triage","variableValue":"<p><span class=\"variable\" data-type=\"mention\" data-id=\"customFunctionAgentflow_1\" data-label=\"customFunctionAgentflow_1\">{{ customFunctionAgentflow_1.output.content }}</span></p>"}],
+          "customFunctionJavascriptFunction": "const result = typeof $triage === 'string' ? (() => { try { return JSON.parse($triage); } catch (_) { return {}; } })() : $triage;\nconst correlationId = result.correlation_id || null;\nreturn JSON.stringify({status:result.status || 'REJECTED',occurrence_id:result.occurrence_id || null,correlation_id:correlationId,action:result.action || null,priority:result.priority || null,responsible_team:result.responsible_team || null,sla_minutes:Number.isInteger(result.sla_minutes) ? result.sla_minutes : null,alert_required:result.alert_required === true,diagnostic_summary:result.diagnostic_summary || null,audit_record_id:correlationId ? 'flowise-' + correlationId : null,error:Array.isArray(result.errors) && result.errors.length ? result.errors : null,processed_at:new Date().toISOString()});",
+          "customFunctionUpdateState": []
+        },
+        "outputAnchors": [{"id":"customFunctionAgentflow_2-output-customFunctionAgentflow","label":"Custom Function","name":"customFunctionAgentflow"}],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 220,
+      "height": 66,
+      "selected": false,
+      "positionAbsolute": {"x": 900, "y": 160},
+      "dragging": false
+    },
+    {
+      "id": "directReplyAgentflow_0",
+      "type": "agentFlow",
+      "position": {"x": 1200, "y": 160},
+      "data": {
+        "id": "directReplyAgentflow_0",
+        "label": "Resposta HTTP observavel",
+        "version": 1.0,
+        "name": "directReplyAgentflow",
+        "type": "DirectReply",
+        "color": "#4DDBBB",
+        "hideOutput": true,
+        "baseClasses": ["DirectReply"],
+        "category": "Agent Flows",
+        "description": "Directly reply to the user with a message",
+        "inputParams": [{"label":"Message","name":"directReplyMessage","type":"string","rows":4,"acceptVariable":true,"id":"directReplyAgentflow_0-input-directReplyMessage-string","display":true}],
+        "inputAnchors": [],
+        "inputs": {"directReplyMessage":"<p><span class=\"variable\" data-type=\"mention\" data-id=\"customFunctionAgentflow_2\" data-label=\"customFunctionAgentflow_2\">{{ customFunctionAgentflow_2.output.content }}</span></p>"},
+        "outputAnchors": [],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 220,
+      "height": 66,
+      "selected": false,
+      "positionAbsolute": {"x": 1200, "y": 160},
+      "dragging": false
+    }
+  ],
+  "edges": [
+    {"source":"startAgentflow_0","sourceHandle":"startAgentflow_0-output-startAgentflow","target":"customFunctionAgentflow_0","targetHandle":"customFunctionAgentflow_0","data":{"sourceColor":"#7EE787","targetColor":"#E4B7FF","isHumanInput":false},"type":"agentFlow","id":"startAgentflow_0-startAgentflow_0-output-startAgentflow-customFunctionAgentflow_0-customFunctionAgentflow_0"},
+    {"source":"customFunctionAgentflow_0","sourceHandle":"customFunctionAgentflow_0-output-customFunctionAgentflow","target":"customFunctionAgentflow_1","targetHandle":"customFunctionAgentflow_1","data":{"sourceColor":"#E4B7FF","targetColor":"#E4B7FF","isHumanInput":false},"type":"agentFlow","id":"customFunctionAgentflow_0-customFunctionAgentflow_0-output-customFunctionAgentflow-customFunctionAgentflow_1-customFunctionAgentflow_1"},
+    {"source":"customFunctionAgentflow_1","sourceHandle":"customFunctionAgentflow_1-output-customFunctionAgentflow","target":"customFunctionAgentflow_2","targetHandle":"customFunctionAgentflow_2","data":{"sourceColor":"#E4B7FF","targetColor":"#E4B7FF","isHumanInput":false},"type":"agentFlow","id":"customFunctionAgentflow_1-customFunctionAgentflow_1-output-customFunctionAgentflow-customFunctionAgentflow_2-customFunctionAgentflow_2"},
+    {"source":"customFunctionAgentflow_2","sourceHandle":"customFunctionAgentflow_2-output-customFunctionAgentflow","target":"directReplyAgentflow_0","targetHandle":"directReplyAgentflow_0","data":{"sourceColor":"#E4B7FF","targetColor":"#4DDBBB","isHumanInput":false},"type":"agentFlow","id":"customFunctionAgentflow_2-customFunctionAgentflow_2-output-customFunctionAgentflow-directReplyAgentflow_0-directReplyAgentflow_0"}
+  ],
+  "viewport": {"x": 0, "y": 0, "zoom": 0.8}
+}

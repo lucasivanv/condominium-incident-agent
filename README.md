@@ -1,271 +1,402 @@
-# Incident Classification Agent
+# Condominium Incident Agent
 
-## Descrição do Problema
+Agente híbrido para classificação, registro e triagem de ocorrências em condomínios residenciais, desenvolvido com LangGraph, Ollama e Flowise.
 
-Condomínios residenciais lidam diariamente com um volume considerável de ocorrências — visitas não autorizadas, encomendas, reclamações de barulho, falhas de manutenção e situações de segurança. Em muitos casos, esses registros são feitos manualmente por porteiros ou zeladores, sem padronização, sem categorização e sem histórico estruturado.
+## Evolução do projeto
 
-Essa falta de organização dificulta a identificação de reincidências, o escalonamento adequado de situações críticas e a geração de relatórios para a administração do condomínio. Além disso, a ausência de um fluxo consistente aumenta o risco de incidentes graves passarem despercebidos ou serem tratados com baixa prioridade.
+Este repositório foi criado a partir de um fork do [Incident Classification Agent](https://github.com/MineiaMaschio/incident-classification-agent), desenvolvido no anteriormente no curso.
 
-## Objetivo do Agente
+O projeto original já possuía classificação com LLM, consulta de moradores, histórico local e persistência de ocorrências. Nesta evolução foram mantidas essas capacidades e adicionados:
 
-O **Incident Classification Agent** é um agente de IA desenvolvido com LangGraph que automatiza o registro e a classificação de incidentes em condomínios residenciais.
+- memória contextual com recuperação paralela e limites explícitos;
+- regras de resiliência para LLM, tools e filesystem;
+- aprovação humana determinística para ocorrências críticas;
+- proteção contra prompt injection e sanitização de dados sensíveis;
+- logs estruturados e auditoria correlacionados por `correlation_id`;
+- integração HTTP com uma automação low-code no Flowise;
+- testes unitários, de integração e adversariais;
+- pipeline de CI com lint, testes, build, artifacts e quality gate;
+- detecção de anomalias e estimativa determinística de risco de falha;
+- evidências técnicas e prompts de desenvolvimento versionados.
 
-A partir de um relato em linguagem natural, o agente:
+## Descrição do problema
 
-- **Valida** os dados de entrada e detecta relatos com múltiplos incidentes
-- **Consulta** o cadastro de moradores para verificar autorizações e identificar residentes
-- **Verifica** o histórico de ocorrências anteriores para detectar reincidências
-- **Classifica** o incidente por categoria e severidade, elevando a severidade automaticamente em caso de reincidência
-- **Persiste** a ocorrência em disco com todos os metadados estruturados
-- **Escala** automaticamente incidentes críticos (severidade HIGH) para uma pasta dedicada
-- **Gera** uma resposta formatada com o resultado do processamento
+Condomínios residenciais registram diariamente visitas, encomendas, reclamações de barulho, falhas de manutenção e situações de segurança. Quando esses relatos são tratados manualmente, sem classificação e histórico estruturado, torna-se difícil identificar reincidências, definir prioridades e investigar decisões.
 
-O resultado esperado é um registro padronizado de cada ocorrência, com rastreabilidade completa, histórico acumulado por apartamento e tratamento diferenciado para situações de alta severidade.
+O sistema transforma um relato em linguagem natural em uma ocorrência estruturada e rastreável. Ele consulta dados locais, recupera contexto, aplica regras de segurança, controla ações críticas e, quando configurado, envia a ocorrência autorizada ao Flowise para triagem operacional.
+
+O público principal é formado por profissionais de portaria, administração, manutenção e segurança condominial.
+
+## Objetivo do agente
+
+A partir de um arquivo JSON, o agente:
+
+- valida os campos de entrada com Pydantic;
+- rejeita relatos com múltiplos incidentes para preservar rastreabilidade;
+- recupera histórico persistido e contexto conversacional em paralelo;
+- consulta moradores e ocorrências anteriores por tools de leitura;
+- classifica categoria e severidade com um modelo local;
+- eleva a severidade quando identifica reincidência;
+- bloqueia ocorrências `HIGH` sem aprovação humana válida;
+- persiste somente ocorrências autorizadas;
+- encaminha ocorrências salvas ao Flowise por HTTP `POST`;
+- produz resposta estruturada, logs e registro de auditoria correlacionados;
+- mantém funcionamento controlado quando uma dependência falha.
+
+## Classificação da solução
+
+A aplicação é um **sistema híbrido**:
+
+- o LLM interpreta o relato, decide quando consultar tools e propõe a classificação;
+- o LangGraph controla sequência, paralelização, ramificações e encerramento;
+- regras Python determinísticas validam schemas, tools, autorização, persistência e integração externa;
+- o Flowise realiza somente a triagem operacional low-code.
+
+O modelo não possui autoridade para aprovar ações críticas, alterar o grafo ou executar persistência e webhooks diretamente.
 
 ---
 
-## Arquitetura e Fluxo com LangGraph
+## Arquitetura e fluxo com LangGraph
 
-O agente é construído como um grafo de estados com LangGraph, onde cada nó realiza uma etapa específica do processamento. O estado é compartilhado entre todos os nós por meio do `AgentState`.
-
-### Estados (`AgentState`)
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `user_input` | `str` | Relato textual do incidente |
-| `reported_by` | `str` | Nome de quem reportou |
-| `reported_at` | `str` | Data/hora do reporte (ISO 8601) |
-| `occurrence_id` | `str \| None` | UUID único gerado para a ocorrência |
-| `category` | `Category \| None` | Categoria classificada pelo LLM |
-| `severity` | `Severity \| None` | Severidade classificada pelo LLM |
-| `involved_people` | `list[str]` | Nomes extraídos do relato |
-| `apartment` | `str \| None` | Apartamento do incidente |
-| `building` | `str \| None` | Bloco/torre do incidente |
-| `summary` | `str \| None` | Resumo gerado em português |
-| `conversation_history` | `list[str]` | Histórico de mensagens da conversa |
-| `output_file` | `str \| None` | Caminho do arquivo JSON salvo |
-| `escalated_file` | `str \| None` | Caminho do arquivo de escalonamento (apenas HIGH) |
-| `classification_error` | `str \| None` | Mensagem de erro em caso de falha |
-| `resident_info` | `dict \| None` | Dados do morador retornados pela tool |
-| `multiple_incidents_detected` | `bool \| None` | Sinaliza relato com múltiplos incidentes |
-| `session_history` | `list[dict]` | Histórico acumulado de ocorrências da sessão |
-
-### Nós do Grafo
-
-| Nó | Responsabilidade |
-|---|---|
-| `validate_input` | Valida campos obrigatórios, gera `occurrence_id` e detecta múltiplos incidentes via LLM |
-| `prepare_context` | Carrega o template do prompt, injeta o histórico de sessão e monta o `conversation_history` |
-| `classify_incident` | Invoca o LLM com tools disponíveis em loop agentic, extrai e valida o JSON de classificação |
-| `handle_error` | Registra a falha de classificação e prepara o estado para a resposta de erro |
-| `save_occurrence` | Persiste o arquivo JSON da ocorrência em disco e atualiza o `session.json` |
-| `generate_response` | Formata e exibe a resposta final ao usuário (sucesso, erro ou rejeição) |
-
-### Diagrama do Fluxo
+O `AgentState` tipado é compartilhado entre os nodes. O grafo combina execução sequencial, fan-out/fan-in para recuperação de contexto e duas ramificações condicionais.
 
 ```mermaid
-graph TD
-    A([START]) --> B[validate_input]
-
-    B -->|multiple_incidents_detected = false| C[prepare_context]
-    B -->|multiple_incidents_detected = true| F[generate_response]
-
-    C --> D[classify_incident]
-
-    D -->|classification_error = None| E[save_occurrence]
-    D -->|classification_error preenchido| G[handle_error]
-
-    E --> F[generate_response]
-    G --> F[generate_response]
-
-    F --> H([END])
+flowchart TD
+    START([START]) --> V[validate_input]
+    V -->|múltiplos incidentes| R[generate_response]
+    V -->|incidente único| S[retrieve_session_context]
+    V -->|incidente único| C[retrieve_conversation_context]
+    S --> P[prepare_context]
+    C --> P
+    P --> I[classify_incident]
+    I -->|erro| E[handle_error]
+    I -->|classificação válida| O[save_occurrence]
+    E --> R
+    O --> F[send_to_flowise]
+    F --> R
+    R --> END([END])
 ```
 
-### Fluxos de Execução
+### Estado compartilhado
 
-**Fluxo principal (incidente único classificado com sucesso):**
-```
-START → validate_input → prepare_context → classify_incident → save_occurrence → generate_response → END
-```
+| Grupo         | Campos principais                                                  | Finalidade                                 |
+| ------------- | ------------------------------------------------------------------ | ------------------------------------------ |
+| Entrada       | `user_input`, `reported_by`, `reported_at`                         | Relato e metadados validados               |
+| Identidade    | `occurrence_id`, `correlation_id`                                  | Identificar ocorrência e execução          |
+| Memória       | `session_history`, `conversation_history`, contextos derivados     | Recuperar reincidências e limitar contexto |
+| Confiança     | `system_instructions`, `untrusted_input`                           | Separar regras de dados externos           |
+| Classificação | `category`, `severity`, `involved_people`, localização e `summary` | Resultado validado do modelo               |
+| Governança    | `human_approval`, `classification_error`                           | Autorizar ou bloquear ações críticas       |
+| Low-code      | status, ação e `flowise_triage`                                    | Resultado operacional do Flowise           |
+| Saída         | `output_file`, `escalated_file`                                    | Referências aos artefatos de runtime       |
 
-**Fluxo de rejeição (múltiplos incidentes detectados):**
-```
-START → validate_input → generate_response → END
-```
+### Nodes do grafo
 
-**Fluxo de erro de classificação:**
-```
-START → validate_input → prepare_context → classify_incident → handle_error → generate_response → END
-```
+| Node                            | Responsabilidade                                          |
+| ------------------------------- | --------------------------------------------------------- |
+| `validate_input`                | Valida a entrada, gera IDs e detecta múltiplos incidentes |
+| `retrieve_session_context`      | Recupera histórico persistido relevante                   |
+| `retrieve_conversation_context` | Limita o histórico conversacional                         |
+| `prepare_context`               | Separa instruções confiáveis dos dados não confiáveis     |
+| `classify_incident`             | Executa o loop agentic e valida a classificação JSON      |
+| `handle_error`                  | Converte falhas de classificação em resposta controlada   |
+| `save_occurrence`               | Valida aprovação e persiste ocorrência autorizada         |
+| `send_to_flowise`               | Envia a ocorrência salva e absorve falhas externas        |
+| `generate_response`             | Sanitiza e apresenta o resultado final                    |
 
-### Decisões Condicionais
+### Fluxos de execução
 
-- **Após `validate_input`**: se `multiple_incidents_detected = True`, o fluxo é encerrado antecipadamente em `generate_response`, sem passar pela classificação.
-- **Após `classify_incident`**: se `classification_error` estiver preenchido (JSON inválido, campos ausentes ou valores fora do enum), o fluxo é desviado para `handle_error`.
+- Fluxo principal:
 
-### Loop Agentic em `classify_incident`
+  ```text
+  START -> validação -> contextos em paralelo -> classificação -> persistência -> Flowise -> resposta -> END
+  ```
 
-O nó `classify_incident` implementa um loop agentic com limite de 5 iterações. Em cada iteração, o LLM pode emitir tool calls. Quando isso ocorre, o `ToolNode` executa as ferramentas e retorna os resultados ao LLM para que ele incorpore as informações antes de produzir a classificação final em JSON.
+- Relato com múltiplos incidentes:
+
+  ```text
+  validate_input -> generate_response -> END
+  ```
+
+- Falha de classificação:
+
+  ```text
+  classify_incident -> handle_error -> generate_response -> END
+  ```
+
+Ocorrência `HIGH` sem aprovação válida é bloqueada em `save_occurrence`; ela não é persistida nem enviada ao Flowise.
+
+### Loop agentic e parada
+
+`classify_incident` permite até cinco iterações de tool calling. Tools desconhecidas ou argumentos inválidos são rejeitados por allowlist. Quando o limite é alcançado ou a dependência falha, o grafo segue pelo caminho de erro. Não há loop entre nodes, e todos os caminhos terminam em `END`.
 
 ---
 
-## Ferramentas Utilizadas
+## Ferramentas e integrações
 
-| Ferramenta | Finalidade | Momento no fluxo |
-|---|---|---|
-| `lookup_resident` | Consulta o cadastro de moradores por apartamento/bloco para verificar nome, visitantes autorizados e veículos cadastrados | Chamada pelo LLM durante `classify_incident` quando o relato menciona apartamento, nome ou placa |
-| `get_session_history` | Retorna ocorrências anteriores de um apartamento registradas na sessão corrente, usadas para detectar reincidências e elevar severidade | Chamada pelo LLM durante `classify_incident` quando o relato menciona um apartamento |
-| `save_occurrence` | Tool exposta ao LLM para que ele sinalize os campos classificados (categoria, severidade, resumo etc.); a gravação real em disco é feita pelo nó `save_occurrence` | Parte da interface de tools do LLM em `classify_incident` |
+### Tools disponíveis ao LLM
 
----
+| Tool                  | Finalidade                                                  |
+| --------------------- | ----------------------------------------------------------- |
+| `lookup_resident`     | Consultar apartamento, bloco, morador, visitante ou veículo |
+| `get_session_history` | Recuperar ocorrências anteriores para validar reincidência  |
 
-## Tecnologias Utilizadas
+As duas tools são locais e somente de leitura. `save_occurrence` e a integração HTTP não são expostas ao LLM; são nodes controlados pelo grafo.
 
-- **Python 3.12+** — linguagem principal do projeto
-- **LangGraph** — orquestração do grafo de estados e fluxo condicional do agente
-- **LangChain** — abstrações para mensagens, tools e integração com o LLM
-- **LangChain Ollama** (`langchain-ollama`) — integração com modelos locais via Ollama
-- **Ollama** — servidor local de LLMs (modelo padrão: `qwen2.5:7b`)
-- **Pydantic** — validação e parsing do schema de entrada (`IncidentInput`)
-- **python-dotenv** — carregamento de variáveis de ambiente a partir do `.env`
-- **uv** — gerenciamento de dependências e ambientes virtuais
-- **pytest** — execução de testes
+### Tool HTTP e Flowise
 
----
+Depois de uma ocorrência ser autorizada e salva, `send_to_flowise` usa `flowise_webhook.py` para:
 
-## Estrutura do Projeto
+1. validar o payload com Pydantic;
+2. exigir `occurrence_id` e `correlation_id`;
+3. enviar um `POST` com timeout configurável;
+4. validar status, schema e correlação da resposta;
+5. devolver `SENT`, `FAILED`, `BLOCKED` ou `NOT_CONFIGURED` sem derrubar o agente.
 
+O AgentFlow V2 importável em [flowise/workflow.json](flowise/workflow.json) possui Webhook Trigger, validação, triagem e resposta síncrona. Ele produz ação, prioridade, equipe responsável, SLA, alerta, diagnóstico e registro de auditoria.
+
+```text
+LangGraph -> HTTP POST -> Webhook Trigger -> triagem Flowise
+          <- resposta operacional síncrona <- Direct Reply
 ```
-incident-classification-agent/
-├── data/
-│   └── residents.json              # Cadastro de moradores do condomínio
-├── examples/
-│   └── input.json                  # Exemplo de entrada para teste
-├── reports/                        # Gerado em runtime
-│   ├── session.json                # Histórico acumulado da sessão
-│   └── escalated/                  # Ocorrências HIGH escalonadas
-├── src/
-│   └── incident_classification_agent/
-│       ├── nodes/
-│       │   ├── validate_input.py
-│       │   ├── prepare_context.py
-│       │   ├── classify_incident.py
-│       │   ├── save_occurrence.py
-│       │   ├── generate_response.py
-│       │   └── handle_error.py
-│       ├── tools/
-│       │   ├── lookup_resident.py
-│       │   ├── get_session_history.py
-│       │   └── save_occurrence.py
-│       ├── prompts/
-│       │   └── classifier.md       # Template do prompt de classificação
-│       ├── enums.py                # Category e Severity
-│       ├── graph.py                # Construção e compilação do grafo
-│       ├── llm.py                  # Configuração do modelo Ollama
-│       ├── main.py                 # Ponto de entrada da aplicação
-│       ├── schemas.py              # Schema Pydantic de entrada
-│       ├── session.py              # Persistência do histórico de sessão
-│       └── state.py                # Definição do AgentState
+
+Consulte o [guia do Flowise](flowise/README.md) e a [evidência low-code](docs/evidencias/low-code.md).
+
+---
+
+## Memória e recuperação contextual
+
+A estratégia combina três níveis:
+
+- `AgentState`: estado tipado da execução atual;
+- `MemorySaver`: checkpointer volátil por `thread_id` durante o processo;
+- histórico persistente: fonte durável para recuperação de ocorrências e reincidências entre execuções.
+
+Após a validação, o grafo recupera em paralelo o contexto da sessão e o histórico conversacional. O contexto enviado ao modelo é limitado a dez ocorrências recentes e seis mensagens de conversa.
+
+Os dados recuperados são sanitizados e enviados como `HumanMessage` dentro de `<untrusted_data>`. O prompt confiável permanece separado em `SystemMessage`. O projeto não utiliza RAG vetorial; a recuperação é estruturada e adequada ao volume e ao domínio atuais.
+
+Detalhes: [estratégia de memória](docs/evidencias/memory.md).
+
+## Segurança, governança e autonomia
+
+Os principais controles são:
+
+- segredos em variáveis de ambiente e `.env` ignorado pelo Git;
+- sanitização de tokens, chaves e senhas em entradas e saídas;
+- separação explícita entre `SystemMessage` e `HumanMessage`;
+- allowlist e validação dos argumentos das tools;
+- validação de categoria, severidade e JSON retornado pelo LLM;
+- aprovação humana HMAC, vinculada ao `occurrence_id` e com expiração;
+- bloqueio de `HIGH` sem aprovação válida antes de qualquer efeito externo;
+- minimização de dados pessoais nas respostas;
+- ausência de payload bruto, prompt ou segredo nos logs de observabilidade.
+
+O teste adversarial envia uma ocorrência `SECURITY/HIGH` contendo prompt injection, uma falsa instrução `APPROVED` e um token. O teste comprova que o texto não cria aprovação, não gera arquivos, não chama o Flowise e não revela o segredo.
+
+Detalhes: [segurança e autonomia](docs/evidencias/security.md).
+
+## Observabilidade e resiliência
+
+Cada execução recebe um `correlation_id` UUID. Todos os nodes são envolvidos por instrumentação que produz dois sinais correlacionados:
+
+- logs estruturados com início, conclusão, falha e duração;
+- trilha de auditoria independente com decisões resumidas.
+
+O sistema não registra o relato bruto, prompts completos, respostas integrais do LLM ou credenciais.
+
+Controles de resiliência:
+
+- timeout do Ollama configurável, com padrão de 60 segundos;
+- até três tentativas apenas para falhas transitórias do LLM;
+- limite de cinco iterações para tool calling;
+- fallback conservador na detecção auxiliar de múltiplos incidentes;
+- escrita atômica de arquivos com temporário e `os.replace`;
+- timeout e falha controlada do Flowise sem desfazer o registro local.
+
+Consulte [observabilidade](docs/evidencias/observability.md) e [resiliência](docs/evidencias/resilience.md).
+
+---
+
+## DevOps e QA assistidos por IA
+
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) é executado em push e Pull Request para `main` e `develop`:
+
+```text
+instalação -> lint -----┐
+           -> testes ---+-> análise -> artifact -> quality gate
+           -> build ----┘
+```
+
+O pipeline usa recursos compatíveis com GitHub Free e executa:
+
+- instalação reproduzível com `uv.lock`;
+- lint com Ruff;
+- pytest com relatório JUnit;
+- build de source distribution e wheel;
+- detecção de falhas, ausência de JUnit, zero testes e regressão de duração;
+- estimativa `risco = probabilidade x impacto`, em escala de 1 a 25;
+- publicação do artifact `ci-quality-evidence`;
+- quality gate que reprova quando lint, testes ou build falham.
+
+A IA foi usada para revisar alterações reais, refinar testes e analisar logs de lint, pytest e build. Os testes foram priorizados por risco; o bloqueio de `HIGH` sem aprovação e o cenário de prompt injection são P0.
+
+A execução final do GitHub Actions após o hardening registrou Ruff aprovado, 235 testes aprovados em 7,14 segundos, build concluído, risco `LOW (1/25)`, nenhuma anomalia e quality gate aprovado. O artifact `ci-quality-evidence` publicou os seis arquivos esperados.
+
+Detalhes: [DevOps e QA](docs/evidencias/devops-qa.md) e [estratégia de testes](docs/evidencias/test-strategy.md).
+
+---
+
+## Tecnologias utilizadas
+
+- Python 3.12+
+- LangGraph e LangChain
+- LangChain Ollama e Ollama
+- Pydantic
+- Flowise 3.1.3 / AgentFlow V2
+- `uv` e Hatchling
+- pytest e Ruff
+- GitHub Actions
+
+## Estrutura do projeto
+
+```text
+condominium-incident-agent/
+├── .github/workflows/ci.yml       # Pipeline e quality gate
+├── data/residents.json            # Cadastro local de exemplo
+├── docs/
+│   ├── evidencias/                # Evidências técnicas e checklist
+│   └── prompts/                   # Prompts usados no desenvolvimento
+├── examples/                      # Entradas reproduzíveis
+├── flowise/
+│   ├── README.md                  # Instalação e uso do AgentFlow
+│   └── workflow.json              # Export do workflow low-code
+├── src/condominium_incident_agent/
+│   ├── nodes/                     # Etapas do LangGraph
+│   ├── prompts/classifier.md      # Instruções de sistema do classificador
+│   ├── tools/                     # Consultas locais e integração HTTP
+│   ├── ci_analysis.py             # Anomalias e estimativa de risco
+│   ├── graph.py                   # Construção do grafo
+│   ├── llm.py                     # Configuração e retry do Ollama
+│   ├── main.py                    # CLI
+│   ├── observability.py           # Logs e auditoria
+│   ├── schemas.py                 # Contrato Pydantic de entrada
+│   ├── security.py                # Sanitização, allowlist e aprovação
+│   ├── session.py                 # Histórico persistente
+│   └── state.py                   # AgentState
 ├── tests/
-│   └── test_llm.py
+│   ├── integration/               # Fluxos ponta a ponta
+│   └── unit/                      # Componentes isolados
 ├── .env.example
-├── .python-version
 ├── pyproject.toml
 └── uv.lock
 ```
 
+O diretório `reports/` é criado apenas em runtime e está no `.gitignore`.
+
 ---
 
-## Como Executar o Projeto
+## Como executar o projeto
 
 ### Pré-requisitos
 
-- **Python 3.12+**
-- **uv** — gerenciador de dependências ([guia de instalação](https://docs.astral.sh/uv/getting-started/installation/))
-- **Ollama** instalado e em execução localmente ([ollama.com](https://ollama.com))
-- Modelo de LLM disponível no Ollama (padrão: `qwen2.5:7b`)
+- Python 3.12+
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+- [Ollama](https://ollama.com) instalado e em execução
+- modelo configurado disponível no Ollama
+- Node.js 22.x e Flowise 3.1.3 apenas para a automação low-code
 
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/<seu-usuario>/incident-classification-agent.git
-cd incident-classification-agent
+git clone https://github.com/lucasivanv/condominium-incident-agent.git
+cd condominium-incident-agent
 ```
 
 ### 2. Instale as dependências
 
 ```bash
-uv sync
+uv sync --locked --all-groups
 ```
 
 ### 3. Configure as variáveis de ambiente
 
-Copie o arquivo de exemplo e defina o modelo Ollama desejado:
+Copie `.env.example` para `.env`:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Em Bash:
 
 ```bash
 cp .env.example .env
 ```
 
-Edite o `.env`:
+Variáveis disponíveis:
 
-```dotenv
-# Exemplos: qwen2.5:7b, llama3.1:8b, mistral:7b
-OLLAMA_MODEL=qwen2.5:7b
-```
+| Variável                  | Obrigatória           | Padrão       | Finalidade             |
+| ------------------------- | --------------------- | ------------ | ---------------------- |
+| `OLLAMA_MODEL`            | Não                   | `qwen2.5:7b` | Modelo local           |
+| `OLLAMA_TIMEOUT_SECONDS`  | Não                   | `60`         | Timeout do modelo      |
+| `HUMAN_APPROVAL_SECRET`   | Para autorizar `HIGH` | Sem valor    | Assinatura HMAC        |
+| `FLOWISE_WEBHOOK_URL`     | Não                   | Vazio        | URL do Webhook Trigger |
+| `FLOWISE_TIMEOUT_SECONDS` | Não                   | `10`         | Timeout do Flowise     |
 
-### 4. Baixe o modelo no Ollama
+Nunca coloque valores reais em `.env.example`.
+
+### 4. Prepare o Ollama
 
 ```bash
 ollama pull qwen2.5:7b
+ollama serve
 ```
 
 ### 5. Execute o agente
 
 ```bash
-uv run python -m incident_classification_agent.main examples/input.json
+uv run python -m condominium_incident_agent.main examples/input_low.json
 ```
 
-Para processar um arquivo de entrada personalizado:
+Outro arquivo pode ser informado no mesmo formato:
 
 ```bash
-uv run python -m incident_classification_agent.main caminho/para/seu/input.json
+uv run python -m condominium_incident_agent.main caminho/para/input.json
 ```
 
-### Executar os testes
+### 6. Ative o Flowise — opcional
 
-```bash
-uv run pytest
-```
+1. Instale e inicie o Flowise 3.1.3.
+2. Importe `flowise/workflow.json` como AgentFlow V2.
+3. Confirme o Webhook Trigger e a resposta síncrona.
+4. Copie a URL `/api/v1/webhook/<AGENTFLOW_ID>` para `FLOWISE_WEBHOOK_URL`.
+5. Execute novamente o agente e confirme `Flowise: SENT`.
+
+A URL `/v2/agentcanvas/<id>` abre o editor e não deve ser usada como webhook.
 
 ---
 
-## Exemplo de Entrada
-
-O arquivo de entrada deve ser um JSON com os seguintes campos:
+## Exemplo de entrada
 
 ```json
 {
-    "user_input": "Às 09h15 Ana Mendes chegou à portaria informando que iria visitar Carlos Mendes, do apartamento 101, bloco A.",
-    "reported_by": "João Silva",
-    "reported_at": "2026-07-14T09:15:00Z"
+  "user_input": "Às 09h15 Ana Mendes chegou à portaria informando que iria visitar Carlos Mendes, do apartamento 101, bloco A.",
+  "reported_by": "João Silva",
+  "reported_at": "2026-07-14T09:15:00Z"
 }
 ```
 
-| Campo | Obrigatório | Descrição |
-|---|---|---|
-| `user_input` | ✅ | Relato textual do incidente |
-| `reported_by` | ✅ | Nome de quem está reportando |
-| `reported_at` | ❌ | Data/hora em ISO 8601. Default: momento atual em UTC |
+| Campo         | Obrigatório | Descrição                                   |
+| ------------- | ----------- | ------------------------------------------- |
+| `user_input`  | Sim         | Relato textual não vazio                    |
+| `reported_by` | Sim         | Responsável pelo registro                   |
+| `reported_at` | Não         | Data ISO 8601; usa UTC atual quando omitida |
 
----
+## Exemplo de saída
 
-## Exemplo de Saída
+Com o Flowise configurado e o AgentFlow em execução, uma resposta completa pode ser:
 
-Para a entrada acima, a saída esperada no terminal é:
-
-```
-⏳ Processando...
-
+```text
 ✅ Ocorrência registrada com sucesso.
 
 🆔 ID: a3f2c1d0-84b2-4e91-bf3a-2c6e1d5f9a00
@@ -273,56 +404,152 @@ Para a entrada acima, a saída esperada no terminal é:
 ⚠️  Severidade: LOW
 🏠 Apartamento: 101
 🏢 Bloco: A
-👥 Envolvidos: Ana Mendes
+👥 Envolvidos: Ana Mendes, Carlos Mendes
 🔍 Morador cadastrado: Carlos Mendes
-   Visitantes autorizados: Ana Mendes, Roberto Mendes
+🔐 Autorização prévia confirmada para visitante mencionado.
 
-📝 Resumo: Ana Mendes chegou à portaria às 09h15 solicitando acesso ao apartamento 101, bloco A. A visitante consta na lista de autorizados do morador Carlos Mendes. Acesso liberado sem irregularidades.
-
-💾 Arquivo salvo em: reports/20260714T091500Z_a3f2c1d0-84b2-4e91-bf3a-2c6e1d5f9a00.json
+📝 Resumo: Solicitação de acesso ao apartamento 101, bloco A.
+💾 Arquivo salvo em: reports/<arquivo-gerado>.json
+🔗 Flowise: SENT
+🎯 Ação operacional: MONITOR
+👷 Equipe responsável: PORTARIA
+📌 Prioridade operacional: NORMAL
+⏱️ Prazo de atendimento: 1440 min
+📊 Diagnóstico Flowise: ACCESS/LOW: encaminhar para PORTARIA em ate 1440 minutos.
 ```
 
-> Os valores de `ID` e `💾 Arquivo salvo em` variam a cada execução. O conteúdo do resumo pode variar conforme o modelo utilizado.
+IDs, resumo, timestamp e caminho variam por execução e modelo. A aplicação não apresenta a lista completa de visitantes autorizados. O status `NOT_CONFIGURED` aparece somente quando `FLOWISE_WEBHOOK_URL` está vazio; nesse modo, a integração é ignorada intencionalmente e o processamento local continua. Se a URL estiver configurada, mas o serviço estiver indisponível ou retornar uma resposta inválida, o status será `FAILED`.
+
+## Cenários de uso
+
+### Fluxo principal
+
+Execute `examples/input_low.json`. O agente deve validar, recuperar contexto, classificar, consultar o cadastro quando necessário e registrar uma ocorrência estruturada. Com Flowise ativo, deve acrescentar a triagem operacional.
+
+### Cenário de risco
+
+O teste de integração adversarial envia prompt injection em uma ocorrência `HIGH`. Mesmo que o texto peça para ignorar regras e marque `APPROVED`, o agente bloqueia a ação sem uma aprovação HMAC válida e não chama o Flowise.
+
+```bash
+uv run pytest tests/integration/test_graph_flow.py -k prompt_injection -q
+```
+
+### Falha externa
+
+Com o Flowise indisponível, o status é `FAILED`, mas uma ocorrência já autorizada e salva não é perdida.
 
 ---
 
-## Principais Decisões de Projeto
+## Testes, lint e build
 
-**Modelo local com Ollama**
-O uso do Ollama com modelos como `qwen2.5:7b` elimina a dependência de APIs externas pagas e mantém os dados dos moradores e das ocorrências dentro do ambiente local. O modelo é configurável via variável de ambiente, permitindo fácil troca sem alteração de código.
+```bash
+# Suíte completa
+uv run pytest -q
 
-**Loop agentic com limit de segurança**
-O nó `classify_incident` implementa um loop de até 5 iterações para executar tool calls encadeadas. O limite evita loops infinitos em caso de comportamento inesperado do modelo.
+# Testes unitários
+uv run pytest tests/unit -q
 
-**Separação entre tool `save_occurrence` e nó `save_occurrence`**
-A tool `save_occurrence` é exposta ao LLM apenas para capturar os campos classificados (categoria, severidade, resumo etc.). A persistência real em disco é responsabilidade exclusiva do nó `save_occurrence`, que injeta os campos de contexto imutáveis do estado (occurrence_id, reported_by, user_input etc.) antes de gravar o arquivo. Isso evita que o LLM sobrescreva dados de contexto.
+# Integração ponta a ponta
+uv run pytest tests/integration -q
 
-**Escalonamento automático de HIGH**
-Ocorrências com severidade HIGH são salvas em `reports/escalated/` além do diretório padrão, sinalizando explicitamente que precisam de triagem prioritária sem depender de filtros manuais.
+# Segurança adversarial
+uv run pytest tests/integration/test_graph_flow.py -k prompt_injection -q
 
-**`thread_id` baseado em `reported_by`**
-O identificador do thread do checkpointer é derivado do nome de quem reporta. Isso isola o histórico de estado por operador de portaria. A limitação conhecida é que porteiros diferentes reportando o mesmo apartamento ficam em threads distintos — o `session.json` é a fonte de verdade para reincidências, independente desse isolamento.
+# Flowise
+uv run pytest tests/unit/test_flowise_webhook.py -q
 
-**Validação de entrada com Pydantic**
-O schema `IncidentInput` valida e normaliza os dados antes de iniciar o grafo, rejeitando strings vazias e garantindo que `reported_at` seja sempre um datetime com timezone UTC.
+# Lint e build
+uv run ruff check .
+uv build
+```
 
----
-
-## Limitações da Solução
-
-- **Dependência do Ollama local**: o agente requer o Ollama instalado e em execução na mesma máquina. Não há suporte nativo para APIs de LLM em nuvem sem alteração no código.
-- **Sem atomicidade no `session.json`**: a escrita no arquivo de sessão é uma operação leitura-modificação-escrita sem garantia de atomicidade. Em ambientes com múltiplos processos simultâneos, há risco de condição de corrida.
-- **`thread_id` baseado em `reported_by`**: porteiros diferentes reportando o mesmo apartamento ficam em threads distintos no checkpointer, o que pode fragmentar o histórico de estado em memória.
+Os testes usam mocks para Ollama e serviços externos e isolam escrita com `tmp_path`.
 
 ---
 
-## Possíveis Melhorias Futuras
+## Principais decisões de projeto
 
-- **API REST com FastAPI**: expor o agente como um serviço HTTP para integração com sistemas de portaria e aplicativos mobile
-- **Persistência em banco de dados**: substituir o `session.json` por PostgreSQL ou SQLite para garantir atomicidade, consultas estruturadas e histórico entre reinicializações do processo
-- **Suporte a múltiplos LLMs**: adicionar suporte a APIs de nuvem (OpenAI, Anthropic, Gemini) com seleção via variável de ambiente
+### Modelo local configurável
+
+Ollama reduz dependência de APIs pagas e mantém o processamento no ambiente local. `OLLAMA_MODEL` permite trocar o modelo sem alterar o código.
+
+### Separação entre LLM e regras determinísticas
+
+O modelo interpreta texto e usa tools de leitura. O código controla validação, autorização, persistência, integração, retries e condições de parada.
+
+### Memória limitada e recuperação paralela
+
+Histórico persistente e conversa são recuperados em ramos independentes e combinados antes da classificação. Limites evitam crescimento irrestrito do contexto.
+
+### Aprovação humana para ações críticas
+
+Severidade `HIGH` não implica autorização automática. A aprovação precisa ser externa, assinada, vigente e vinculada à ocorrência.
+
+### Low-code como apoio
+
+O Flowise acrescenta triagem observável após a decisão principal. Sua indisponibilidade não impede o comportamento essencial do agente.
+
+### QA assistido por IA com validação objetiva
+
+A IA foi utilizada durante o desenvolvimento para revisar alterações, identificar riscos e sugerir ou refinar testes. No pipeline, porém, a aprovação é decidida por verificações objetivas: exit codes do Ruff, pytest e build, dados do relatório JUnit e a fórmula fixa `risco = probabilidade x impacto`. O GitHub Actions não chama Ollama ou outro LLM para aprovar o código; assim, uma falha real não pode ser reinterpretada pela IA como sucesso.
+
 ---
 
-## Considerações Finais
+## Evidências e documentação
 
-O Incident Classification Agent demonstra como LangGraph pode ser usado para orquestrar um fluxo de processamento estruturado com decisões condicionais, tool calling agentico e persistência de estado — tudo sem depender de serviços externos. O projeto combina validação robusta de entrada, classificação inteligente com contexto histórico e escalonamento automático de incidentes críticos, entregando um pipeline completo e extensível para gestão de ocorrências em condomínios residenciais.
+| Tema                          | Documento                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------- |
+| Checklist dos critérios       | [checklist.md](docs/evidencias/checklist.md)                               |
+| Arquitetura                   | [architecture.md](docs/evidencias/architecture.md)                         |
+| Configuração e reprodução     | [execution-configuration.md](docs/evidencias/execution-configuration.md)   |
+| Memória                       | [memory.md](docs/evidencias/memory.md)                                     |
+| Segurança                     | [security.md](docs/evidencias/security.md)                                 |
+| Observabilidade               | [observability.md](docs/evidencias/observability.md)                       |
+| Resiliência                   | [resilience.md](docs/evidencias/resilience.md)                             |
+| Testes                        | [test-strategy.md](docs/evidencias/test-strategy.md)                       |
+| DevOps, QA, anomalia e risco  | [devops-qa.md](docs/evidencias/devops-qa.md)                               |
+| Flowise                       | [low-code.md](docs/evidencias/low-code.md)                                 |
+| Prompts, modelo e refinamento | [prompts-model-refinement.md](docs/evidencias/prompts-model-refinement.md) |
+
+As instruções usadas no desenvolvimento estão em `docs/prompts/`. O prompt de runtime do classificador está em `src/condominium_incident_agent/prompts/classifier.md`.
+
+## Ciclo de refinamento relevante
+
+O hardening de segurança corrigiu um problema em que relato e contexto eram interpolados no mesmo texto do prompt confiável. A solução separou `SystemMessage` e `HumanMessage`, delimitou dados externos, sanitizou segredos e adicionou um teste E2E de prompt injection. O histórico real da mudança está no commit `0142457`.
+
+Detalhes e análise crítica estão em [prompts-model-refinement.md](docs/evidencias/prompts-model-refinement.md).
+
+---
+
+## Limitações da solução
+
+- Ollama precisa estar instalado e ativo para execução real.
+- O CLI não oferece uma interface interativa de aprovação humana; o contrato de aprovação é exercitado por testes e pode ser integrado a uma interface externa.
+- `MemorySaver`, logs e auditoria são voláteis após o encerramento do processo.
+- A persistência local não forma uma transação única e pressupõe execução sequencial.
+- A sanitização cobre padrões comuns, não todo formato possível de dado sensível.
+- A proteção contra prompt injection reduz risco, mas não é universal.
+- O Flowise precisa ser importado, publicado e iniciado separadamente.
+- O histórico do Flowise e os artifacts do GitHub Actions são evidências externas ao checkout local.
+
+## Possíveis melhorias futuras
+
+- API REST para integração com sistemas de portaria;
+- banco transacional para concorrência e consultas estruturadas;
+- auditoria persistente e métricas exportáveis;
+- interface autenticada para aprovação humana;
+- autenticação do webhook Flowise;
+- suporte configurável a outros provedores de LLM;
+- testes operacionais com serviços reais em ambiente controlado.
+
+---
+
+## Considerações finais
+
+O Condominium Incident Agent evolui o projeto original para uma solução agêntica demonstrável e governada. LangGraph coordena o fluxo, o LLM interpreta o domínio, regras determinísticas controlam segurança e efeitos colaterais, e o Flowise fornece uma automação visual com saída observável. Memória, observabilidade, resiliência, testes e CI completam a rastreabilidade necessária para compreender, executar e avaliar o projeto.
+
+---
+
+## Vídeo de demonstração
+
+[Assistir ao vídeo de demonstração no YouTube](https://www.youtube.com/watch?v=UadJeXur_c4).
