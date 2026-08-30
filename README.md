@@ -547,3 +547,9 @@ Detalhes e análise crítica estão em [prompts-model-refinement.md](docs/eviden
 ## Considerações finais
 
 O Condominium Incident Agent evolui o projeto original para uma solução agêntica demonstrável e governada. LangGraph coordena o fluxo, o LLM interpreta o domínio, regras determinísticas controlam segurança e efeitos colaterais, e o Flowise fornece uma automação visual com saída observável. Memória, observabilidade, resiliência, testes e CI completam a rastreabilidade necessária para compreender, executar e avaliar o projeto.
+
+---
+
+## Vídeo de demonstração
+
+[Assistir ao vídeo de demonstração no YouTube](https://www.youtube.com/watch?v=UadJeXur_c4).

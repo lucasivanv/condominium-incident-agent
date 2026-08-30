@@ -36,7 +36,7 @@ def get_llm() -> ChatOllama:
     o modelo, pois ``with_retry`` retorna um ``RunnableRetry`` que não
     expõe ``bind_tools``.
     """
-    model = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+    model = os.getenv("OLLAMA_MODEL", "").strip() or "qwen2.5:7b"
     logger.info("Initializing Ollama model: %s", model)
 
     return ChatOllama(
